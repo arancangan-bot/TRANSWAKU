@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitoring Kunjungan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white p-6">
+
+<h1 class="text-2xl font-bold mb-6 text-center">Monitoring Kunjungan</h1>
+
+<div id="list" class="grid gap-4"></div>
+
+<script>
+function loadData() {
+  const list = document.getElementById('list');
+  let data = JSON.parse(localStorage.getItem('kunjungan')) || [];
+
+  list.innerHTML = '';
+
+  data.forEach((item, index) => {
+    const now = Date.now();
+    const diff = now - item.start;
+    const total = 30 * 60 * 1000;
+
+    let bg = 'bg-green-500';
+
+    if (diff > 10000) bg = 'bg-yellow-500';
+    if (diff > total - 10000) bg = 'bg-red-600';
+
+    if (diff >= total && !item.called) {
+      speak(`Nomor antrian ${item.no}, atas nama ${item.pengunjung}, kunjungan ke ${item.wbp} telah selesai`);
+      item.called = true;
+      localStorage.setItem('kunjungan', JSON.stringify(data));
+    }
+
+    const sisa = Math.max(0, total - diff);
+    const menit = Math.floor(sisa / 60000);
+    const detik = Math.floor((sisa % 60000) / 1000);
+
+    const card = document.createElement('div');
+    card.className = `${bg} p-4 rounded-xl shadow-lg`;
+
+    card.innerHTML = `
+      <div class="text-lg font-bold">No Antrian: ${item.no}</div>
+      <div>Pengunjung: ${item.pengunjung}</div>
+      <div>WBP: ${item.wbp}</div>
+      <div>Mulai: ${item.waktu}</div>
+      <div class="mt-2 font-semibold">Sisa Waktu: ${menit}m ${detik}s</div>
+    `;
+
+    list.appendChild(card);
+  });
+}
+
+function speak(text) {
+  const speech = new SpeechSynthesisUtterance(text);
+  speech.lang = 'id-ID';
+  speech.rate = 0.9;
+  window.speechSynthesis.speak(speech);
+}
+
+setInterval(loadData, 1000);
+</script>
+
+</body>
+</html>
