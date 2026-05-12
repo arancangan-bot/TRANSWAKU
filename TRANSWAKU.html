@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TRANSWAKU</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background-image: url('https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17');
+            background-attachment: fixed;
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 80%;
+            background: rgba(255,255,255,0.9);
+        }
+
+        table, th, td {
+            border: 1px solid black;
+        }
+
+        th, td {
+            padding: 10px;
+        }
+
+        .merah {
+            color: red;
+            font-weight: bold;
+        }
+
+        .hijau {
+            color: green;
+            font-weight: bold;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+        }
+
+        #btnHapusSemua {
+            background: red;
+            color: white;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>RANCANGAN AKTUALISASI RICKY MARTIN</h2>
+<h2>TRANSFARASI WAKTU KUNJUNGAN</h2>
+<h2>LAPAS KELAS IIA CIKARANG</h2>
+
+<input type="text" id="nama" placeholder="Nama Pengunjung">
+<input type="text" id="wbp" placeholder="Nama WBP/Tahanan">
+<button onclick="tambahData()">Tambahkan</button>
+
+<p id="info"></p>
+
+<table>
+    <thead>
+        <tr>
+            <th>No</th>
+            <th>Nama Pengunjung</th>
+            <th>Nama WBP/Tahanan</th>
+            <th>Waktu Kunjungan</th>
+            <th>Aksi</th>
+        </tr>
+    </thead>
+    <tbody id="tabelData"></tbody>
+</table>
+
+<!-- TOMBOL HAPUS SEMUA -->
+<button id="btnHapusSemua" onclick="hapusSemuaData()">Hapus Semua Data</button>
+
+<div id="notifikasi" style="position:fixed;top:20px;right:20px;background:red;color:white;padding:15px;border-radius:8px;display:none;"></div>
+
+<script>
+let daftarData = JSON.parse(localStorage.getItem("dataKunjungan")) || [];
+const waktuAwal = 15;
+
+// SIMPAN DATA
+function simpanData() {
+    localStorage.setItem("dataKunjungan", JSON.stringify(daftarData));
+}
+
+// TAMBAH DATA
+function tambahData() {
+    let nama = document.getElementById("nama").value.trim();
+    let wbp = document.getElementById("wbp").value.trim();
+
+    if (!nama || !wbp) {
+        alert("Tidak boleh kosong!");
+        return;
+    }
+
+    daftarData.push({
+        nama,
+        wbp,
+        waktu: waktuAwal,
+        selesai: false,
+        persiapan: true,
+        waktuPersiapan: 10
+    });
+
+    simpanData();
+    tampilkanTabel();
+    mulaiTimer(daftarData.length - 1);
+
+    document.getElementById("nama").value = "";
+    document.getElementById("wbp").value = "";
+}
+
+// HAPUS SATU DATA
+function hapusData(index) {
+    if (confirm("Hapus data ini?")) {
+        daftarData.splice(index, 1);
+        simpanData();
+        tampilkanTabel();
+    }
+}
+
+// HAPUS SEMUA DATA
+function hapusSemuaData() {
+    if (confirm("Yakin ingin menghapus SEMUA data?")) {
+        daftarData = [];
+        simpanData();
+        tampilkanTabel();
+    }
+}
+
+// TAMPILKAN TABEL
+function tampilkanTabel() {
+    let tabel = document.getElementById("tabelData");
+    tabel.innerHTML = "";
+
+    daftarData.forEach((item, index) => {
+        let tampilan = "";
+        let kelas = "";
+
+        if (item.persiapan) {
+            tampilan = "PERSIAPAN";
+            kelas = "hijau";
+        } else if (item.selesai) {
+            tampilan = "SELESAI";
+            kelas = "merah";
+        } else {
+            let m = Math.floor(item.waktu / 60);
+            let d = item.waktu % 60;
+            tampilan = m + ":" + d.toString().padStart(2,'0');
+
+            if (item.waktu <= 10) kelas = "merah";
+        }
+
+        tabel.innerHTML += `
+        <tr>
+            <td>${index+1}</td>
+            <td>${item.nama}</td>
+            <td>${item.wbp}</td>
+            <td id="timer-${index}" class="${kelas}">${tampilan}</td>
+            <td><button onclick="hapusData(${index})">Hapus</button></td>
+        </tr>`;
+    });
+
+    document.getElementById("info").innerText = "Total: " + daftarData.length;
+}
+
+// TIMER
+function mulaiTimer(index) {
+    let interval = setInterval(() => {
+        let data = daftarData[index];
+        if (!data) return;
+
+        let el = document.getElementById("timer-" + index);
+        if (!el) return;
+
+        // PERSIAPAN
+        if (data.persiapan) {
+            if (data.waktuPersiapan > 0) {
+                el.innerText = "PERSIAPAN (" + data.waktuPersiapan + "s)";
+                el.classList.add("hijau");
+                data.waktuPersiapan--;
+            } else {
+                data.persiapan = false;
+                el.classList.remove("hijau");
+            }
+            simpanData();
+            return;
+        }
+
+        // HITUNG MUNDUR
+        if (data.waktu > 0) {
+            data.waktu--;
+            let m = Math.floor(data.waktu / 60);
+            let d = data.waktu % 60;
+            el.innerText = m + ":" + d.toString().padStart(2,'0');
+
+            if (data.waktu <= 10) el.classList.add("merah");
+
+        } else {
+            clearInterval(interval);
+            data.selesai = true;
+            el.innerText = "SELESAI";
+            el.classList.add("merah");
+
+            panggilSuara(index, data);
+            tampilkanNotifikasi(index, data);
+        }
+
+        simpanData();
+    }, 1000);
+}
+
+// SUARA
+function panggilSuara(index, data) {
+    let text = `Nomor antrian ${index+1}, atas nama ${data.nama}, kunjungan untuk ${data.wbp}, waktu telah habis`;
+
+    let speech = new SpeechSynthesisUtterance(text);
+    speech.lang = "id-ID";
+    speech.rate = 0.9;
+
+    speechSynthesis.speak(speech);
+}
+
+// NOTIFIKASI
+function tampilkanNotifikasi(index, data) {
+    let notif = document.getElementById("notifikasi");
+
+    notif.innerHTML = `
+        <b>WAKTU HABIS!</b><br>
+        No: ${index+1}<br>
+        ${data.nama} → ${data.wbp}
+    `;
+
+    notif.style.display = "block";
+
+    setTimeout(() => {
+        notif.style.display = "none";
+    }, 10000);
+}
+
+// LOAD
+window.onload = function() {
+    tampilkanTabel();
+
+    daftarData.forEach((item, index) => {
+        if (!item.selesai) {
+            mulaiTimer(index);
+        }
+    });
+}
+</script>
+
+</body>
+</html>
