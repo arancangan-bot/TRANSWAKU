@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Monitoring Antrian</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-black text-white p-6">
+
+<h1 class="text-3xl text-center mb-6 font-bold">MONITOR KUNJUNGAN</h1>
+
+<div id="list" class="grid md:grid-cols-3 gap-4"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "ISI_CONFIG_KAMU",
+  authDomain: "ISI",
+  databaseURL: "ISI",
+  projectId: "ISI"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const list = document.getElementById("list");
+
+db.ref("kunjungan").on("value", (snapshot) => {
+  list.innerHTML = "";
+  const data = snapshot.val();
+  if (!data) return;
+
+  Object.keys(data).forEach((key, index) => {
+    const item = data[key];
+
+    const now = Date.now();
+    const diff = now - item.start;
+    const total = 30 * 60 * 1000;
+
+    let warna = "bg-green-500";
+    if (diff > 10000) warna = "bg-yellow-500";
+    if (diff > total - 10000) warna = "bg-red-600";
+
+    // suara saat selesai
+    if (diff >= total && !item.called) {
+      speak(`Nomor ${index+1}, ${item.pengunjung}, kunjungan ke ${item.wbp} selesai`);
+      db.ref("kunjungan/" + key).update({ called: true });
+    }
+
+    const sisa = Math.max(0, total - diff);
+    const menit = Math.floor(sisa / 60000);
+    const detik = Math.floor((sisa % 60000) / 1000);
+
+    const card = document.createElement("div");
+    card.className = `${warna} p-4 rounded-xl text-black font-semibold`;
+
+    card.innerHTML = `
+      <div class="text-lg">No: ${index+1}</div>
+      <div>Pengunjung: ${item.pengunjung}</div>
+      <div>WBP: ${item.wbp}</div>
+      <div>Sisa: ${menit}m ${detik}s</div>
+    `;
+
+    list.appendChild(card);
+  });
+});
+
+function speak(text) {
+  const speech = new SpeechSynthesisUtterance(text);
+  speech.lang = "id-ID";
+  speech.rate = 0.9;
+  window.speechSynthesis.speak(speech);
+}
+</script>
+
+</body>
+</html>
