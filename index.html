@@ -1,37 +1,48 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Input Kunjungan</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<title>Input Kunjungan</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-100 flex items-center justify-center h-screen">
 
-<div class="bg-white p-8 rounded-2xl shadow-xl w-96">
-  <h2 class="text-xl font-bold mb-4 text-center">Form Kunjungan</h2>
-  
-  <input id="pengunjung" class="w-full p-2 border rounded mb-3" placeholder="Nama Pengunjung">
+<div class="bg-white p-6 rounded-xl shadow w-80">
+  <h2 class="text-xl font-bold text-center mb-4">Input Kunjungan</h2>
+
+  <input id="pengunjung" class="w-full p-2 border rounded mb-2" placeholder="Nama Pengunjung">
   <input id="wbp" class="w-full p-2 border rounded mb-3" placeholder="Nama WBP">
 
-  <button onclick="tambahData()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Tambah</button>
-
-  <a href="list.html" class="block text-center mt-4 text-blue-600">Lihat Data</a>
+  <button onclick="kirim()" class="w-full bg-blue-500 text-white p-2 rounded">
+    Tambah Antrian
+  </button>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
 <script>
-function tambahData() {
+const firebaseConfig = {
+  apiKey: "ISI_CONFIG_KAMU",
+  authDomain: "ISI",
+  databaseURL: "ISI",
+  projectId: "ISI"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+function kirim() {
   const pengunjung = document.getElementById('pengunjung').value;
   const wbp = document.getElementById('wbp').value;
 
   if (!pengunjung || !wbp) {
-    alert('Harap isi semua data');
+    alert("Harap isi semua");
     return;
   }
 
-  let data = JSON.parse(localStorage.getItem('kunjungan')) || [];
-
-  data.push({
-    no: data.length + 1,
+  db.ref("kunjungan").push({
     pengunjung,
     wbp,
     waktu: new Date().toLocaleString(),
@@ -39,11 +50,7 @@ function tambahData() {
     called: false
   });
 
-  localStorage.setItem('kunjungan', JSON.stringify(data));
-
-  alert('Data berhasil ditambahkan');
-  document.getElementById('pengunjung').value = '';
-  document.getElementById('wbp').value = '';
+  alert("Antrian ditambahkan");
 }
 </script>
 
