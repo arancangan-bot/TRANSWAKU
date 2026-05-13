@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>TransWaku | Sistem Kunjungan Otomatis - Lapas Cikarang</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+            min-height: 100vh;
+            padding: 30px 20px 60px 20px;
+            /* BACKGROUND GAMBAR JERUJI BESI PENJARA - nuansa penjara yang tegas */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.6)), url('https://images.pexels.com/photos/6352062/pexels-photo-6352062.jpeg?auto=compress&cs=tinysrgb&w=1600');
+            background-attachment: fixed;
+            background-size: cover;
+            background-position: center 20%;
+            background-repeat: no-repeat;
+        }
+
+        /* container utama glassmorphism formal */
+        .main-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            padding: 25px 30px 35px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+
+        /* HEADER DENGAN LOGO GANDA (Kementerian Imigrasi & Pemasyarakatan + Kemasyarakatan terbaru) */
+        .logo-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 35px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #cbd5e1;
+        }
+
+        .logo-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,240,0.1);
+            padding: 6px 18px;
+            border-radius: 60px;
+            backdrop-filter: blur(2px);
+        }
+
+        .logo-item img {
+            height: 65px;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .logo-item span {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #1e2f47;
+            background: #fef9e6;
+            padding: 2px 10px;
+            border-radius: 30px;
+            letter-spacing: 0.3px;
+        }
+
+        /* judul utama */
+        .judul-utama {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            color: #0a2b44;
+            margin: 8px 0;
+        }
+
+        h2:first-of-type {
+            font-size: 1.7rem;
+            color: #0b3b5f;
+            background: linear-gradient(135deg, #1e466e, #103a55);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            text-shadow: none;
+        }
+
+        h2:nth-of-type(2) {
+            font-size: 1.55rem;
+            color: #1f5e3a;
+            display: inline-block;
+            padding: 0 20px;
+        }
+
+        h2:last-of-type {
+            font-size: 1.3rem;
+            color: #9e2b1f;
+            font-weight: 500;
+        }
+
+        /* form input modern */
+        .form-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 0 20px;
+        }
+
+        .form-area input {
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 18px;
+            font-size: 1rem;
+            border: 1px solid #cfdde6;
+            border-radius: 60px;
+            background: white;
+            outline: none;
+            transition: 0.2s;
+            font-weight: 500;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+
+        .form-area input:focus {
+            border-color: #2a7f62;
+            box-shadow: 0 0 0 3px rgba(42,127,98,0.2);
+        }
+
+        button {
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border: none;
+            background: #1e466e;
+            color: white;
+            transition: 0.2s;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+            background: #0f3557;
+        }
+
+        /* info statistik */
+        .info-stats {
+            background: #eef2f7;
+            padding: 8px 20px;
+            border-radius: 40px;
+            display: inline-block;
+            margin: 5px 0 20px;
+            font-weight: 600;
+            color: #1e466e;
+        }
+
+        /* tabel modern */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 1.2rem;
+            margin: 15px 0 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background: #1e3c4a;
+            color: white;
+            padding: 14px 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+
+        tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        .merah {
+            color: #dc2626;
+            font-weight: 700;
+            background: #fee2e2;
+            border-radius: 40px;
+            display: inline-block;
+            padding: 4px 12px;
+            min-width: 85px;
+        }
+
+        .hijau {
+            color: #0e7c32;
+            font-weight: 700;
+            background: #dcfce7;
+            border-radius: 40px;
+            display: inline-block;
+            padding: 4px 12px;
+        }
+
+        td .timer-badge {
+            display: inline-block;
+            font-family: monospace;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+
+        /* tombol hapus dalam tabel */
+        .btn-hapus-satu {
+            background: #b91c1c;
+            padding: 6px 18px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            box-shadow: none;
+        }
+
+        .btn-hapus-satu:hover {
+            background: #991b1b;
+            transform: scale(0.97);
+        }
+
+        /* tombol hapus semua */
+        .hapus-semua-wrapper {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        #btnHapusSemua {
+            background: #9b2c2c;
+            padding: 12px 32px;
+            font-size: 1rem;
+        }
+
+        #btnHapusSemua:hover {
+            background: #7f1a1a;
+        }
+
+        /* notifikasi premium */
+        .notif-modern {
+            position: fixed;
+            top: 25px;
+            right: 25px;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 28px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            z-index: 1000;
+            border-left: 6px solid #ffd966;
+            max-width: 360px;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+
+        /* responsif */
+        @media (max-width: 700px) {
+            .main-container {
+                padding: 18px;
+            }
+            th, td {
+                font-size: 0.8rem;
+                padding: 8px 5px;
+            }
+            button {
+                padding: 10px 20px;
+            }
+            .logo-item img {
+                height: 45px;
+            }
+            h2:first-of-type {
+                font-size: 1.3rem;
+            }
+        }
+
+        td:nth-child(4) {
+            font-weight: 600;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <!-- LOGO GANDA: Kementerian Imigrasi dan Pemasyarakatan + Logo Kemasyarakatan Terbaru -->
+    <div class="logo-header">
+        <div class="logo-item">
+            <!-- Logo Kementerian Imigrasi dan Pemasyarakatan (versi resmi) -->
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Logo_of_the_Ministry_of_Law_and_Human_Rights_of_the_Republic_of_Indonesia.svg/1200px-Logo_of_the_Ministry_of_Law_and_Human_Rights_of_the_Republic_of_Indonesia.svg.png" 
+                 alt="Kemenimipas RI" 
+                 onerror="this.src='https://via.placeholder.com/80x80?text=Kemenimipas'">
+            <span>Kementerian Imigrasi dan Pemasyarakatan</span>
+        </div>
+        <div class="logo-item">
+            <!-- Logo Pemasyarakatan terbaru -->
+            <img src="https://pbs.twimg.com/media/GNv-PNob0AAk4Eu?format=png&name=small" 
+                 alt="Logo Pemasyarakatan Terbaru"
+                 onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Insignia_of_Indonesian_Corrections.svg/1200px-Insignia_of_Indonesian_Corrections.svg.png'">
+            <span>Direktorat Jenderal Pemasyarakatan</span>
+        </div>
+    </div>
+
+    <div class="judul-utama">
+        <h2>🏛️ RANCANGAN AKTUALISASI RICKY MARTIN</h2>
+        <h2>⏱️ JAM KUNJUNGAN OTOMATIS</h2>
+        <h2>⚖️ LAPAS KELAS IIA CIKARANG</h2>
+    </div>
+
+    <div class="form-area">
+        <input type="text" id="nama" placeholder="👤 Nama Pengunjung" autocomplete="off">
+        <input type="text" id="wbp" placeholder="🔒 Nama WBP / Tahanan" autocomplete="off">
+        <button onclick="tambahData()">➕ Tambahkan Antrian</button>
+    </div>
+
+    <div style="text-align: center;">
+        <span class="info-stats" id="info">📋 Total Antrian: 0</span>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Nama Pengunjung</th>
+                    <th>Nama WBP/Tahanan</th>
+                    <th>⏲️ Waktu / Status</th>
+                    <th>⚙️ Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="tabelData"></tbody>
+        </table>
+    </div>
+
+    <div class="hapus-semua-wrapper">
+        <button id="btnHapusSemua" onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button>
+    </div>
+</div>
+
+<div id="notifikasi" style="display:none;"></div>
+
+<script>
+    // Data awal dari localStorage
+    let daftarData = JSON.parse(localStorage.getItem("dataKunjungan")) || [];
+    const waktuAwal = 1;           // durasi kunjungan dalam MENIT (untuk demo 1 menit, bisa diubah ke 15)
+    let intervalTracker = [];       
+
+    // Fungsi simpan ke localStorage
+    function simpanData() {
+        localStorage.setItem("dataKunjungan", JSON.stringify(daftarData));
+    }
+
+    // Membersihkan interval berdasarkan index
+    function clearIntervalForIndex(index) {
+        if (intervalTracker[index]) {
+            clearInterval(intervalTracker[index]);
+            intervalTracker[index] = null;
+        }
+    }
+
+    // Tambah data baru
+    function tambahData() {
+        let nama = document.getElementById("nama").value.trim();
+        let wbp = document.getElementById("wbp").value.trim();
+
+        if (!nama || !wbp) {
+            alert("⚠️ Form tidak boleh kosong! Silakan isi Nama Pengunjung dan Nama WBP/Tahanan.");
+            return;
+        }
+
+        if (daftarData.length >= 35) {
+            alert("⚠️ Antrian terlalu padat, maksimal 35 data. Hapus beberapa antrian selesai.");
+            return;
+        }
+
+        daftarData.push({
+            nama: nama,
+            wbp: wbp,
+            waktu: waktuAwal,           // dalam menit (akan dikonversi ke detik setelah persiapan)
+            selesai: false,
+            persiapan: true,
+            waktuPersiapan: 10          // 10 detik persiapan
+        });
+
+        simpanData();
+        tampilkanTabel();
+        const newIndex = daftarData.length - 1;
+        mulaiTimer(newIndex);
+
+        document.getElementById("nama").value = "";
+        document.getElementById("wbp").value = "";
+        
+        setTimeout(() => {
+            let lastRow = document.querySelector("#tabelData tr:last-child");
+            if(lastRow) lastRow.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+    }
+
+    // Hapus satu data berdasarkan index
+    function hapusData(index) {
+        if (confirm(`❌ Hapus antrian untuk "${daftarData[index]?.nama}" ?`)) {
+            clearIntervalForIndex(index);
+            daftarData.splice(index, 1);
+            rebuildAllTimers();
+            simpanData();
+            tampilkanTabel();
+        }
+    }
+
+    // Hapus semua data
+    function hapusSemuaData() {
+        if (confirm("⚠️ PERINGATAN: Semua data antrian akan dihapus permanen. Lanjutkan?")) {
+            for (let i = 0; i < intervalTracker.length; i++) {
+                if (intervalTracker[i]) clearInterval(intervalTracker[i]);
+            }
+            intervalTracker = [];
+            daftarData = [];
+            simpanData();
+            tampilkanTabel();
+        }
+    }
+
+    // Menampilkan tabel dengan gaya timer & status
+    function tampilkanTabel() {
+        let tbody = document.getElementById("tabelData");
+        tbody.innerHTML = "";
+
+        daftarData.forEach((item, idx) => {
+            let statusHtml = "";
+
+            if (item.persiapan) {
+                let sisaPersiapan = item.waktuPersiapan;
+                statusHtml = `<span class="hijau timer-badge">⏳ PERSIAPAN (${sisaPersiapan}s)</span>`;
+            } 
+            else if (item.selesai) {
+                statusHtml = `<span class="merah timer-badge">✔️ SELESAI</span>`;
+            } 
+            else {
+                let menit = Math.floor(item.waktu / 60);
+                let detik = item.waktu % 60;
+                let waktuTeks = `${menit}:${detik.toString().padStart(2,'0')}`;
+                let warningClass = (item.waktu <= 10) ? "merah" : "";
+                statusHtml = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${waktuTeks}</span>`;
+            }
+
+            let baris = `
+                <tr>
+                    <td style="font-weight:600;">${idx+1}</td>
+                    <td>${escapeHtml(item.nama)}</td>
+                    <td>${escapeHtml(item.wbp)}</td>
+                    <td id="timer-${idx}">${statusHtml}</td>
+                    <td><button class="btn-hapus-satu" onclick="hapusData(${idx})">🗑 Hapus</button></td>
+                </tr>
+            `;
+            tbody.innerHTML += baris;
+        });
+
+        document.getElementById("info").innerHTML = `📋 Total Antrian: ${daftarData.length} | 🕒 Durasi kunjungan: ${waktuAwal} menit + 10s persiapan`;
+    }
+
+    function escapeHtml(str) {
+        if(!str) return "";
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // MEMBANGUN ULANG SEMUA TIMER
+    function rebuildAllTimers() {
+        for (let i = 0; i < intervalTracker.length; i++) {
+            if (intervalTracker[i]) clearInterval(intervalTracker[i]);
+        }
+        intervalTracker = [];
+        daftarData.forEach((item, index) => {
+            if (!item.selesai) {
+                mulaiTimer(index);
+            }
+        });
+    }
+
+    // Timer utama persiapan + kunjungan
+    function mulaiTimer(index) {
+        if (intervalTracker[index]) {
+            clearInterval(intervalTracker[index]);
+            intervalTracker[index] = null;
+        }
+
+        let data = daftarData[index];
+        if (!data) return;
+        if (data.selesai) return;
+
+        const intervalId = setInterval(() => {
+            if (!daftarData[index] || daftarData[index].selesai) {
+                if (intervalTracker[index]) clearInterval(intervalTracker[index]);
+                intervalTracker[index] = null;
+                return;
+            }
+
+            let currentData = daftarData[index];
+            let timerCell = document.getElementById(`timer-${index}`);
+
+            // Fase Persiapan (10 detik)
+            if (currentData.persiapan) {
+                if (currentData.waktuPersiapan > 0) {
+                    currentData.waktuPersiapan--;
+                    if (timerCell) {
+                        timerCell.innerHTML = `<span class="hijau timer-badge">⏳ PERSIAPAN (${currentData.waktuPersiapan}s)</span>`;
+                    }
+                    simpanData();
+                } 
+                else {
+                    currentData.persiapan = false;
+                    currentData.waktu = waktuAwal * 60;   // konversi menit ke detik
+                    simpanData();
+                    if (timerCell) {
+                        let menit = Math.floor(currentData.waktu / 60);
+                        let detik = currentData.waktu % 60;
+                        timerCell.innerHTML = `<span class="timer-badge">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
+                    }
+                }
+                return;
+            }
+
+            // Fase hitungan mundur kunjungan (dalam detik)
+            if (currentData.waktu > 0 && !currentData.selesai) {
+                currentData.waktu--;
+                let menit = Math.floor(currentData.waktu / 60);
+                let detik = currentData.waktu % 60;
+                let waktuStr = `${menit}:${detik.toString().padStart(2,'0')}`;
+                if (timerCell) {
+                    let warningClass = (currentData.waktu <= 10) ? "merah" : "";
+                    timerCell.innerHTML = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${waktuStr}</span>`;
+                }
+                simpanData();
+            } 
+            else if (!currentData.selesai && currentData.waktu <= 0 && !currentData.persiapan) {
+                clearInterval(intervalId);
+                intervalTracker[index] = null;
+                currentData.selesai = true;
+                simpanData();
+                if (timerCell) {
+                    timerCell.innerHTML = `<span class="merah timer-badge">✔️ SELESAI</span>`;
+                }
+                // PANGGIL SUARA DENGAN KALIMAT BARU : "Silahkan Untuk bersiap-Siap meninggalkan ruangan kunjungan. Terimakasih"
+                panggilSuara(index, currentData);
+                tampilkanNotifikasiModern(index, currentData);
+                tampilkanTabel(); 
+            }
+        }, 1000);
+
+        intervalTracker[index] = intervalId;
+    }
+
+    // FUNGSI SUARA DENGAN PERUBAHAN KALIMAT AKHIR sesuai permintaan terbaru
+    // Teks: "Perhatian! Nomor antrian ... waktu kunjungan telah habis. Silahkan Untuk bersiap-Siap meninggalkan ruangan kunjungan. Terimakasih"
+    function panggilSuara(index, data) {
+        if (!data) return;
+        let text = `Perhatian! Nomor antrian ${index+1}, atas nama ${data.nama}, kunjungan untuk ${data.wbp}, waktu kunjungan telah habis. Silahkan Untuk bersiap-Siap meninggalkan ruangan kunjungan. Terimakasih.`;
+        
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
+        let speech = new SpeechSynthesisUtterance(text);
+        speech.lang = "id-ID";
+        speech.rate = 0.88;
+        speech.pitch = 1;
+        speech.volume = 1;
+        setTimeout(() => {
+            window.speechSynthesis.speak(speech);
+        }, 50);
+    }
+
+    // Notifikasi modern di pojok kanan atas (caption disesuaikan juga)
+    function tampilkanNotifikasiModern(index, data) {
+        let notifBox = document.getElementById("notifikasi");
+        if (!notifBox) return;
+
+        notifBox.innerHTML = `
+            <div class="notif-modern">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:28px;">⏰</span>
+                    <div>
+                        <strong style="font-size:1.1rem;">WAKTU KUNJUNGAN HABIS</strong><br>
+                        🧾 No. Antrian: ${index+1}<br>
+                        👤 ${escapeHtml(data.nama)} → 🔒 ${escapeHtml(data.wbp)}
+                    </div>
+                </div>
+                <div style="margin-top:8px; font-size:12px; opacity:0.9;">🔔 Silahkan bersiap-siap meninggalkan ruangan kunjungan. Terimakasih.</div>
+            </div>
+        `;
+        notifBox.style.display = "block";
+        setTimeout(() => {
+            if (notifBox) notifBox.style.display = "none";
+        }, 8000);
+    }
+
+    // LOAD awal dan inisialisasi timer
+    window.onload = function() {
+        tampilkanTabel();
+
+        for (let i = 0; i < daftarData.length; i++) {
+            const item = daftarData[i];
+            if (!item.selesai && item.persiapan && item.waktuPersiapan <= 0) {
+                item.persiapan = false;
+                item.waktu = waktuAwal * 60;
+                simpanData();
+            }
+            if (!item.selesai && !item.persiapan && item.waktu <= 0) {
+                item.selesai = true;
+                simpanData();
+            }
+            if (!item.selesai) {
+                mulaiTimer(i);
+            }
+        }
+        tampilkanTabel();
+
+        const inputNama = document.getElementById("nama");
+        const inputWbp = document.getElementById("wbp");
+        function handleEnter(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                tambahData();
+            }
+        }
+        inputNama.addEventListener("keypress", handleEnter);
+        inputWbp.addEventListener("keypress", handleEnter);
+    };
+</script>
+</body>
+</html>
