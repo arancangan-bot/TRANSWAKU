@@ -1,4 +1,4 @@
-      <!DOCTYPE html>
+     <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -15,8 +15,8 @@
             font-family: 'Segoe UI', 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
             min-height: 100vh;
             padding: 30px 20px 60px 20px;
-            /* BACKGROUND MENGGUNAKAN FILE LOKAL "background.png" */
-            background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.55)), url('background.png');
+            /* BACKGROUND LANGSUNG TANPA OVERLAY TRANSPARAN */
+            background-image: url('background.png');
             background-attachment: fixed;
             background-size: cover;
             background-position: center 30%;
@@ -53,55 +53,79 @@
             max-height: calc(100vh - 280px);
         }
 
-        /* HEADER DENGAN LOGO KIRI-KANAN DAN JUDUL TENGAH - LEBIH RAPAT & LOGO BESAR */
+        /* ========= HEADER DENGAN GAMBAR BACKGROUND LANGSUNG, TANPA LAPISAN TRANSPARAN ========= */
         .header-wrapper {
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-wrap: wrap;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #cbd5e1;
-            gap: 10px;
+            margin-bottom: 0;
+            padding-bottom: 15px;
+            
+            /* GARIS TEBAL DI BAWAH 3 KALIMAT DAN 2 LOGO */
+            border-bottom: 4px solid #facc15;
+            
+            /* BACKGROUND LANGSUNG GAMBAR (tanpa overlay apapun) */
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center 30%;
+            background-repeat: no-repeat;
+            
+            border-radius: 24px 24px 0 0;
         }
+        
+        /* Area logo dan judul: tidak ada background gelap */
         .logo-left, .logo-right {
             flex-shrink: 0;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 8px 16px;
         }
-        .logo-left img, .logo-right img {
-            height: 100px;
-            width: auto;
-            object-fit: contain;
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
-            background: transparent;
-            transition: height 0.2s;
-        }
+        
+        /* Judul utama dipaksa berada di tengah secara sempurna */
         .judul-utama {
             text-align: center;
             flex: 1;
+            padding: 8px 16px;
         }
+        
+        /* Teks judul dikontraskan dengan text-shadow solid */
         .judul-utama h2 {
-            font-weight: 700;
-            letter-spacing: -0.2px;
+            text-shadow: 2px 2px 5px #000000;
+            font-weight: 800;
             margin: 4px 0;
+            letter-spacing: 0.5px;
         }
+        
         .judul-utama h2:first-child {
             font-size: 1.5rem;
-            background: linear-gradient(135deg, #1e466e, #103a55);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
+            color: #FFE484;
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            text-shadow: 2px 2px 4px black;
         }
         .judul-utama h2:nth-child(2) {
             font-size: 1.45rem;
-            color: #1f5e3a;
+            color: #FFF2B5;
+            text-shadow: 2px 2px 6px black;
         }
         .judul-utama h2:last-child {
             font-size: 1.25rem;
-            color: #9e2b1f;
-            font-weight: 500;
+            color: #FFD966;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px black;
+        }
+        
+        /* Logo tetap dengan filter bayangan agar kontras */
+        .logo-left img, .logo-right img {
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+            height: 100px;
+            width: auto;
+            object-fit: contain;
+            background: transparent;
+            transition: height 0.2s;
         }
 
         .form-area {
@@ -239,10 +263,11 @@
             background: #0f3557;
         }
 
+        /* Responsive: judul tetap center meski logo turun ke bawah */
         @media (max-width: 850px) {
             .header-wrapper {
                 flex-direction: column;
-                gap: 8px;
+                gap: 12px;
             }
             .logo-left img, .logo-right img {
                 height: 80px;
@@ -250,6 +275,13 @@
             .judul-utama h2:first-child { font-size: 1.2rem; }
             .judul-utama h2:nth-child(2) { font-size: 1.1rem; }
             .judul-utama h2:last-child { font-size: 1rem; }
+            .judul-utama {
+                width: 100%;
+                order: 2; /* agar judul tetap di tengah saat kolom */
+            }
+            .logo-left, .logo-right {
+                order: 1;
+            }
         }
 
         @media (max-width: 700px) {
@@ -270,7 +302,7 @@
 <body>
 
 <div class="main-container" id="mainContainer">
-    <!-- HEADER: LOGO BESAR, LEBIH DEKAT DENGAN JUDUL -->
+    <!-- HEADER: background gambar langsung, tanpa transparan, garis bawah tebal. Judul center sempurna -->
     <div class="header-wrapper">
         <div class="logo-left">
             <img src="imipas.png" alt="Kemenimipas" onerror="this.onerror=null; this.style.opacity='0.85';">
