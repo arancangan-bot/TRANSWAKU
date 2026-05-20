@@ -2,128 +2,335 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Jamkot | Input Antrian - Lapas Cikarang</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Antrian - Lapas Cikarang</title>
+    <!-- Firebase SDK -->
+    // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBmWTuBg0PBpZSEWNJUm9pJwEQuV03O2MY",
+  authDomain: "antrian-lapas-cikarang.firebaseapp.com",
+  projectId: "antrian-lapas-cikarang",
+  storageBucket: "antrian-lapas-cikarang.firebasestorage.app",
+  messagingSenderId: "283658990470",
+  appId: "1:283658990470:web:351606d22d74777586b207",
+  measurementId: "G-CDJR3PEH53"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', 'Poppins', system-ui;
+            font-family: 'Segoe UI', system-ui;
             min-height: 100vh;
             padding: 30px 20px;
-            background-image: url('background.png');
-            background-size: cover;
-            background-position: center;
-            background-color: #0f2c38;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: #1e3c4a;
         }
-        .card-input {
-            max-width: 550px;
-            width: 100%;
-            background: rgba(255,255,255,0.96);
+        .main-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.94);
             border-radius: 2rem;
-            padding: 2rem;
+            padding: 25px;
             box-shadow: 0 25px 45px rgba(0,0,0,0.3);
         }
-        .logo-area { text-align: center; margin-bottom: 20px; }
-        .logo-area img { height: 70px; margin: 0 5px; }
-        .judul { text-align: center; margin-bottom: 30px; }
-        .judul h2 { color: #1e3c4a; border-left: 6px solid #facc15; display: inline-block; padding: 0 20px; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { font-weight: 700; display: block; margin-bottom: 8px; color: #0f2c38; }
-        .form-group input {
-            width: 100%;
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 60px;
-            font-size: 1rem;
+        .header-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            border-bottom: 4px solid #facc15;
+            margin-bottom: 20px;
         }
-        .form-group input:focus { border-color: #2a7f62; outline: none; }
-        .btn-group { display: flex; gap: 15px; margin-top: 20px; }
+        .judul-utama { text-align: center; flex: 1; }
+        .judul-utama h2 { color: #1e3c4a; }
+        .logo-left img, .logo-right img { height: 70px; }
+        .toolbar-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
         button {
-            flex: 1;
-            padding: 12px;
-            border-radius: 60px;
-            font-weight: 700;
+            padding: 10px 20px;
+            border-radius: 40px;
             border: none;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-simpan { background: #2a7f62; color: white; }
-        .btn-back { background: #475569; color: white; }
-        button:hover { transform: translateY(-2px); filter: brightness(1.05); }
-        .info-antrian { background: #f1f5f9; border-radius: 2rem; padding: 12px; text-align: center; margin-top: 20px; font-weight: 600; }
-        .notif-sukses {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            background: #0e7c32;
+            background: #2a7f62;
             color: white;
-            padding: 14px;
-            border-radius: 60px;
-            text-align: center;
-            z-index: 1000;
-            max-width: 400px;
-            margin: 0 auto;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-hapus-semua { background: #b91c1c; }
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 550px;
+            border-radius: 1rem;
+            border: 1px solid #ccc;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        th {
+            background: #1e3c4a;
+            color: white;
+            padding: 12px;
+            position: sticky;
+            top: 0;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .status-persiapan { background: #dcfce7; color: #0e7c32; display: inline-block; padding: 4px 12px; border-radius: 40px; }
+        .status-selesai { background: #fee2e2; color: #dc2626; display: inline-block; padding: 4px 12px; border-radius: 40px; }
+        .status-aktif { font-weight: bold; }
+        .btn-hapus { background: #b91c1c; padding: 4px 12px; font-size: 0.8rem; }
+        .auto-refresh-badge {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.7);
+            color: #facc15;
+            padding: 5px 12px;
+            border-radius: 30px;
+            font-size: 0.75rem;
         }
     </style>
 </head>
 <body>
-<div class="card-input">
-    <div class="logo-area">
-        <img src="imipas.png" alt="Kemenimipas" onerror="this.style.display='none'">
-        <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display='none'">
+<div class="main-container">
+    <div class="header-wrapper">
+        <div class="logo-left"><img src="https://via.placeholder.com/70?text=Kemenimipas" alt="Logo"></div>
+        <div class="judul-utama"><h2>LAPAS KELAS IIA CIKARANG</h2><h2>DASHBOARD ANTRIAN ONLINE</h2></div>
+        <div class="logo-right"><img src="https://via.placeholder.com/70?text=Pemasyarakatan" alt="Logo"></div>
     </div>
-    <div class="judul"><h2>📋 TAMBAH ANTRIAN</h2><p>Lapas Kelas IIA Cikarang</p></div>
-    <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder></div>
-    <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder=autocomplete="off"></div>
-    <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
-    <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
+    <div class="toolbar-area">
+        <button onclick="window.location.href='input.html'">📝 Buka Halaman Input (HP)</button>
+        <button onclick="ulangiPanggilanTerakhir()">🔁 Ulangi Panggilan Terakhir</button>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead><tr><th>No</th><th>Pengunjung</th><th>WBP</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody id="tabelData"></tbody>
+        </table>
+    </div>
+    <div style="text-align:center; margin-top:20px">
+        <button class="btn-hapus-semua" onclick="hapusSemuaData()">🗑️ Hapus Semua Antrian</button>
+    </div>
 </div>
-<div id="notifTemp"></div>
+<div id="notifikasi" style="position:fixed; top:20px; right:20px; z-index:9999;"></div>
+<div class="auto-refresh-badge" id="refreshIndicator">🔄 Online | Firebase</div>
+
 <script>
-    let dataAntrian = [];
-    function loadData() {
-        const stored = localStorage.getItem("dataKunjungan");
-        dataAntrian = stored ? JSON.parse(stored) : [];
-        document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${dataAntrian.length} orang`;
+    // GANTI DENGAN KONFIGURASI FIREBASE ANDA
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "123456789",
+        appId: "YOUR_APP_ID"
+    };
+
+    // Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const antrianRef = database.ref('antrian');
+
+    let daftarData = [];
+    let intervalTimers = [];
+    let antrianSuara = [];
+    let sedangSuara = false;
+    let panggilanTerakhir = null;
+    const DURASI_KUNJUNGAN = 60; // 60 detik = 1 menit
+
+    // Load data dari Firebase secara realtime
+    antrianRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            // Convert object ke array (urutan berdasarkan key push ID)
+            let newData = Object.keys(data).map(key => {
+                return { ...data[key], firebaseKey: key };
+            });
+            // Urutkan berdasarkan waktu dibuat (timestamp)
+            newData.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+            if (JSON.stringify(daftarData) !== JSON.stringify(newData)) {
+                daftarData = newData;
+                resetSemuaTimer();
+                renderTabel();
+                mulaiSemuaTimer();
+                document.getElementById('refreshIndicator').style.background = '#facc15';
+                setTimeout(() => document.getElementById('refreshIndicator').style.background = 'rgba(0,0,0,0.7)', 500);
+            }
+        } else {
+            daftarData = [];
+            resetSemuaTimer();
+            renderTabel();
+        }
+    });
+
+    function resetSemuaTimer() {
+        intervalTimers.forEach(clearInterval);
+        intervalTimers = [];
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        antrianSuara = [];
+        sedangSuara = false;
     }
-    function simpanDanRefresh() {
-        localStorage.setItem("dataKunjungan", JSON.stringify(dataAntrian));
-        loadData();
-        window.dispatchEvent(new StorageEvent('storage', { key: 'dataKunjungan', newValue: JSON.stringify(dataAntrian) }));
+
+    function mulaiTimer(index) {
+        const item = daftarData[index];
+        if (!item || item.selesai) return;
+        if (intervalTimers[index]) clearInterval(intervalTimers[index]);
+
+        const timerId = setInterval(() => {
+            const current = daftarData[index];
+            if (!current || current.selesai) {
+                clearInterval(timerId);
+                intervalTimers[index] = null;
+                return;
+            }
+            if (current.persiapan) {
+                if (current.waktuPersiapan > 0) {
+                    current.waktuPersiapan--;
+                    updateKeFirebase(current.firebaseKey, { waktuPersiapan: current.waktuPersiapan });
+                } else {
+                    current.persiapan = false;
+                    current.waktu = DURASI_KUNJUNGAN;
+                    updateKeFirebase(current.firebaseKey, { persiapan: false, waktu: current.waktu });
+                }
+                renderTabel();
+            } else if (current.waktu > 0) {
+                current.waktu--;
+                updateKeFirebase(current.firebaseKey, { waktu: current.waktu });
+                renderTabel();
+            } else if (!current.selesai && current.waktu <= 0) {
+                clearInterval(timerId);
+                intervalTimers[index] = null;
+                current.selesai = true;
+                updateKeFirebase(current.firebaseKey, { selesai: true });
+                renderTabel();
+                panggilSuara(index, current.nama, current.wbp);
+                tampilNotifikasi(index, current);
+            }
+        }, 1000);
+        intervalTimers[index] = timerId;
     }
-    function tampilNotif(pesan, isError=false) {
-        let div = document.createElement("div");
-        div.className = "notif-sukses";
-        div.style.background = isError ? "#b91c1c" : "#0e7c32";
-        div.innerText = pesan;
-        let container = document.getElementById("notifTemp");
-        container.innerHTML = "";
-        container.appendChild(div);
-        setTimeout(() => div.remove(), 3000);
+
+    function mulaiSemuaTimer() {
+        daftarData.forEach((_, i) => {
+            if (!daftarData[i].selesai) mulaiTimer(i);
+        });
     }
-    function tambahAntrianBaru() {
-        let nama = document.getElementById("namaPengunjung").value.trim();
-        let wbp = document.getElementById("namaWbp").value.trim();
-        if(!nama || !wbp) { tampilNotif("⚠️ Kedua field harus diisi!", true); return; }
-        // TIDAK ADA BATASAN MAKSIMAL (unlimited)
-        dataAntrian.push({ nama, wbp, waktu: 0, selesai: false, persiapan: true, waktuPersiapan: 10 });
-        simpanDanRefresh();
-        tampilNotif(`✅ Antrian ditambahkan! No. ${dataAntrian.length} - ${nama} → ${wbp}`);
-        document.getElementById("namaPengunjung").value = "";
-        document.getElementById("namaWbp").value = "";
-        document.getElementById("namaPengunjung").focus();
+
+    function updateKeFirebase(key, dataPartial) {
+        antrianRef.child(key).update(dataPartial);
     }
-    function kembaliKeDashboard() {
-        // Mengarah ke file index.html di folder yang sama
-        window.location.href = './Jamkot.html';
+
+    function renderTabel() {
+        const tbody = document.getElementById('tabelData');
+        tbody.innerHTML = '';
+        daftarData.forEach((item, i) => {
+            let statusHtml = '';
+            if (item.persiapan) {
+                statusHtml = `<span class="status-persiapan">⏳ Persiapan (${item.waktuPersiapan}s)</span>`;
+            } else if (item.selesai) {
+                statusHtml = `<span class="status-selesai">✔️ Selesai</span>`;
+            } else {
+                const menit = Math.floor(item.waktu / 60);
+                const detik = item.waktu % 60;
+                statusHtml = `<span class="status-aktif">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
+            }
+            tbody.innerHTML += `
+                <tr>
+                    <td>${i+1}</td>
+                    <td>${escapeHtml(item.nama)}</td>
+                    <td>${escapeHtml(item.wbp)}</td>
+                    <td>${statusHtml}</td>
+                    <td><button class="btn-hapus" onclick="hapusSatu('${item.firebaseKey}')">Hapus</button></td>
+                </tr>
+            `;
+        });
     }
-    loadData();
-    setInterval(loadData, 3000);
-    window.addEventListener('storage', (e) => { if(e.key === 'dataKunjungan') loadData(); });
+
+    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m];}); }
+
+    function hapusSatu(key) {
+        if (confirm('Hapus antrian ini?')) {
+            antrianRef.child(key).remove();
+        }
+    }
+
+    function hapusSemuaData() {
+        if (confirm('Hapus SEMUA antrian?')) {
+            antrianRef.remove();
+        }
+    }
+
+    // Suara
+    async function getVoice() {
+        return new Promise(resolve => {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length) resolve(voices.find(v => v.lang === 'id-ID') || voices[0]);
+            else setTimeout(() => resolve(getVoice()), 100);
+        });
+    }
+    async function playSuara(nomor, nama, wbp) {
+        const teks = `Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Terima kasih.`;
+        return new Promise(async (resolve) => {
+            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+            const speech = new SpeechSynthesisUtterance(teks);
+            speech.lang = 'id-ID';
+            speech.rate = 0.9;
+            const voice = await getVoice();
+            if (voice) speech.voice = voice;
+            speech.onend = resolve;
+            window.speechSynthesis.speak(speech);
+        });
+    }
+    async function panggilSuara(index, nama, wbp) {
+        const nomor = index+1;
+        antrianSuara.push({nomor,nama,wbp});
+        antrianSuara.push({nomor,nama,wbp}); // dua kali
+        panggilanTerakhir = {nomor,nama,wbp};
+        prosesAntrianSuara();
+    }
+    async function prosesAntrianSuara() {
+        if (sedangSuara || antrianSuara.length===0) return;
+        sedangSuara = true;
+        const item = antrianSuara.shift();
+        await playSuara(item.nomor, item.nama, item.wbp);
+        await new Promise(r => setTimeout(r, 600));
+        sedangSuara = false;
+        prosesAntrianSuara();
+    }
+    async function ulangiPanggilanTerakhir() {
+        if (!panggilanTerakhir) {
+            const lastSelesai = [...daftarData].reverse().find(i => i.selesai);
+            if (!lastSelesai) { alert('Belum ada antrian selesai.'); return; }
+            const idx = daftarData.findIndex(i => i.firebaseKey === lastSelesai.firebaseKey);
+            panggilanTerakhir = { nomor: idx+1, nama: lastSelesai.nama, wbp: lastSelesai.wbp };
+        }
+        await playSuara(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+    }
+    function tampilNotifikasi(idx, data) {
+        const notifDiv = document.getElementById('notifikasi');
+        notifDiv.innerHTML = `<div style="background:#dc2626;color:white;padding:12px;border-radius:20px;">⏰ Waktu habis! No.${idx+1} ${data.nama} → ${data.wbp}</div>`;
+        setTimeout(() => notifDiv.innerHTML = '', 5000);
+    }
+    // Panggil voice preload
+    window.speechSynthesis.getVoices();
 </script>
 </body>
 </html>
