@@ -137,15 +137,15 @@
 <div class="auto-refresh-badge" id="refreshIndicator">🔄 Sinkron realtime</div>
 
 <script type="module">
-    // ==================== KONFIGURASI FIREBASE (SAMA SEPERTI DI INPUT.HTML) ====================
+    // ==================== KONFIGURASI FIREBASE (SUDAH DENGAN databaseURL) ====================
     const firebaseConfig = {
-          apiKey: "AIzaSyCAmnu2YFewAm07IJ1a2_lN4N3i-TL5hAM",
-  authDomain: "transwaku-e0fc6.firebaseapp.com",
-    databaseURL: "https://console.firebase.google.com/u/0/project/transwaku-e0fc6/database/transwaku-e0fc6-default-rtdb/data/~2F",
-  projectId: "transwaku-e0fc6",
-  storageBucket: "transwaku-e0fc6.firebasestorage.app",
-  messagingSenderId: "797562598719",
-  appId: "1:797562598719:web:5143263044366af884cf8a",
+        apiKey: "AIzaSyCAmnu2YFewAm07IJ1a2_lN4N3i-TL5hAM",
+        authDomain: "transwaku-e0fc6.firebaseapp.com",
+        databaseURL: "https://transwaku-e0fc6-default-rtdb.firebaseio.com",  // ← TELAH DITAMBAHKAN
+        projectId: "transwaku-e0fc6",
+        storageBucket: "transwaku-e0fc6.firebasestorage.app",
+        messagingSenderId: "797562598719",
+        appId: "1:797562598719:web:5143263044366af884cf8a",
     };
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -156,14 +156,14 @@
     const antrianRef = ref(db, 'antrian');
 
     // Variabel global
-    let daftarData = [];        // data dari Firebase
-    let dataKeys = [];          // key Firebase per index
-    let intervalTracker = [];   // untuk timer setiap baris
-    let antrianSuara = [];      // queue suara
+    let daftarData = [];
+    let dataKeys = [];
+    let intervalTracker = [];
+    let antrianSuara = [];
     let sedangSuara = false;
     let panggilanTerakhir = null;
     let suaraPerempuan = null;
-    const DURASI_MENIT = 1;     // 1 menit kunjungan
+    const DURASI_MENIT = 1;
 
     // ======================== FIRESTORE REALTIME ========================
     function bindFirebaseRealtime() {
@@ -174,16 +174,13 @@
                 newData.push(childSnapshot.val());
                 newKeys.push(childSnapshot.key);
             });
-            // Urutkan berdasarkan timestamp (opsional, agar antrian berurutan)
             newData.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
-            // Cek perubahan
             if (JSON.stringify(daftarData) !== JSON.stringify(newData)) {
                 daftarData = newData;
                 dataKeys = newKeys;
                 resetSemuaTimerDanSuara();
                 renderTabel();
                 mulaiSemuaTimer();
-                // Animasi badge
                 const badge = document.getElementById('refreshIndicator');
                 badge.style.background = '#facc15';
                 badge.style.color = '#1e3c4a';
@@ -208,7 +205,6 @@
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         antrianSuara = [];
         sedangSuara = false;
-        // panggilanTerakhir jangan direset agar tetap bisa diulang
     }
 
     function mulaiTimer(index) {
@@ -254,7 +250,7 @@
                 await updateItemToFirebase(index, { selesai: true });
                 panggilSuara(index, cur.nama, cur.wbp);
                 tampilkanNotifikasi(index, cur);
-                renderTabel(); // refresh untuk tombol dll
+                renderTabel();
             }
         }, 1000);
         intervalTracker[index] = intervalId;
@@ -266,7 +262,7 @@
         });
     }
 
-    // ======================== SUARA (GAYA BCA) ========================
+    // ======================== SUARA ========================
     async function getSuaraPerempuan() {
         return new Promise((resolve) => {
             if (suaraPerempuan) { resolve(suaraPerempuan); return; }
@@ -303,7 +299,7 @@
     async function panggilSuara(index, nama, wbp) {
         const nomor = index + 1;
         antrianSuara.push({ nomor, nama, wbp });
-        antrianSuara.push({ nomor, nama, wbp }); // dua kali
+        antrianSuara.push({ nomor, nama, wbp });
         panggilanTerakhir = { nomorUrut: nomor, nama, wbp };
         prosesAntrianSuara();
     }
