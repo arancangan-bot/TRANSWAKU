@@ -1,0 +1,643 @@
+     <!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Jamkot | Sistem Kunjungan Otomatis - Lapas Cikarang</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+            min-height: 100vh;
+            padding: 30px 20px 60px 20px;
+            /* BACKGROUND LANGSUNG TANPA OVERLAY TRANSPARAN */
+            background-image: url('background.png');
+            background-attachment: fixed;
+            background-size: cover;
+            background-position: center 30%;
+            background-repeat: no-repeat;
+            transition: all 0.3s ease;
+        }
+
+        .main-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(2px);
+            border-radius: 2rem;
+            padding: 25px 30px 35px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        /* Fullscreen mode */
+        .main-container.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            border-radius: 0;
+            padding: 20px 30px;
+            overflow-y: auto;
+            z-index: 9999;
+            background: rgba(255, 255, 255, 0.98);
+        }
+        .fullscreen .table-wrapper {
+            max-height: calc(100vh - 280px);
+        }
+
+        /* ========= HEADER DENGAN GAMBAR BACKGROUND LANGSUNG, TANPA LAPISAN TRANSPARAN ========= */
+        .header-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 0;
+            padding-bottom: 15px;
+            
+            /* GARIS TEBAL DI BAWAH 3 KALIMAT DAN 2 LOGO */
+            border-bottom: 4px solid #facc15;
+            
+            /* BACKGROUND LANGSUNG GAMBAR (tanpa overlay apapun) */
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center 30%;
+            background-repeat: no-repeat;
+            
+            border-radius: 24px 24px 0 0;
+        }
+        
+        /* Area logo dan judul: tidak ada background gelap */
+        .logo-left, .logo-right {
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 8px 16px;
+        }
+        
+        /* Judul utama dipaksa berada di tengah secara sempurna */
+        .judul-utama {
+            text-align: center;
+            flex: 1;
+            padding: 8px 16px;
+        }
+        
+        /* Teks judul dikontraskan dengan text-shadow solid */
+        .judul-utama h2 {
+            text-shadow: 2px 2px 5px #000000;
+            font-weight: 800;
+            margin: 4px 0;
+            letter-spacing: 0.5px;
+        }
+        
+        .judul-utama h2:first-child {
+            font-size: 1.5rem;
+            color: #FFE484;
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            text-shadow: 2px 2px 4px black;
+        }
+        .judul-utama h2:nth-child(2) {
+            font-size: 1.45rem;
+            color: #FFF2B5;
+            text-shadow: 2px 2px 6px black;
+        }
+        .judul-utama h2:last-child {
+            font-size: 1.25rem;
+            color: #FFD966;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px black;
+        }
+        
+        /* Logo tetap dengan filter bayangan agar kontras */
+        .logo-left img, .logo-right img {
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+            height: 100px;
+            width: auto;
+            object-fit: contain;
+            background: transparent;
+            transition: height 0.2s;
+        }
+
+        .form-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 0 20px;
+        }
+        .form-area input {
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 18px;
+            font-size: 1rem;
+            border: 1px solid #cfdde6;
+            border-radius: 60px;
+            background: white;
+            outline: none;
+            transition: 0.2s;
+            font-weight: 500;
+        }
+        .form-area input:focus { border-color: #2a7f62; box-shadow: 0 0 0 3px rgba(42,127,98,0.2); }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border: none;
+            background: #1e466e;
+            color: white;
+            transition: 0.2s;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        button:hover { transform: translateY(-2px); filter: brightness(1.05); background: #0f3557; }
+        .btn-repeat-last {
+            background: #2d5f3e;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-repeat-last:hover { background: #1e4a2f; }
+        .btn-fullscreen {
+            background: #6b21a5;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-fullscreen:hover { background: #581c87; }
+
+        /* Info statistik disembunyikan */
+        .info-stats {
+            display: none;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 520px;
+            border-radius: 1.2rem;
+            margin: 15px 0 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            position: relative;
+            scroll-behavior: smooth;
+            border: 1px solid #e2e8f0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.95rem;
+            min-width: 800px;
+        }
+        th {
+            background: #1e3c4a;
+            color: white;
+            padding: 14px 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+        tr:hover td { background-color: #f8fafc; }
+        .merah { color: #dc2626; font-weight: 700; background: #fee2e2; border-radius: 40px; display: inline-block; padding: 4px 12px; min-width: 85px; }
+        .hijau { color: #0e7c32; font-weight: 700; background: #dcfce7; border-radius: 40px; display: inline-block; padding: 4px 12px; }
+        td .timer-badge { display: inline-block; font-family: monospace; font-size: 1rem; letter-spacing: 0.5px; }
+        .btn-hapus-satu { background: #b91c1c; padding: 6px 18px; border-radius: 30px; font-size: 0.8rem; box-shadow: none; }
+        .btn-hapus-satu:hover { background: #991b1b; transform: scale(0.97); }
+        .hapus-semua-wrapper { text-align: center; margin-top: 10px; }
+        #btnHapusSemua { background: #9b2c2c; padding: 12px 32px; font-size: 1rem; }
+
+        .notif-modern {
+            position: fixed;
+            top: 25px;
+            right: 25px;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            backdrop-filter: blur(10px);
+            border-radius: 28px;
+            padding: 18px 24px;
+            color: white;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.4);
+            z-index: 10000;
+            border-left: 6px solid #facc15;
+            max-width: 360px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .notif-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .notif-header span:first-child { font-size: 32px; }
+        .notif-content strong { color: #ffea8a; }
+
+        .table-wrapper::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .table-wrapper::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: #1e466e;
+            border-radius: 10px;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #0f3557;
+        }
+
+        /* Responsive: judul tetap center meski logo turun ke bawah */
+        @media (max-width: 850px) {
+            .header-wrapper {
+                flex-direction: column;
+                gap: 12px;
+            }
+            .logo-left img, .logo-right img {
+                height: 80px;
+            }
+            .judul-utama h2:first-child { font-size: 1.2rem; }
+            .judul-utama h2:nth-child(2) { font-size: 1.1rem; }
+            .judul-utama h2:last-child { font-size: 1rem; }
+            .judul-utama {
+                width: 100%;
+                order: 2; /* agar judul tetap di tengah saat kolom */
+            }
+            .logo-left, .logo-right {
+                order: 1;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .main-container { padding: 18px; }
+            th, td { font-size: 0.8rem; padding: 8px 5px; }
+            .notif-modern { max-width: 300px; padding: 14px 18px; top: 15px; right: 15px; }
+            .table-wrapper { max-height: 420px; }
+            .btn-group { gap: 8px; }
+            button { padding: 10px 18px; font-size: 0.85rem; }
+            table { min-width: 720px; }
+            .fullscreen .table-wrapper { max-height: calc(100vh - 320px); }
+            .logo-left img, .logo-right img {
+                height: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container" id="mainContainer">
+    <!-- HEADER: background gambar langsung, tanpa transparan, garis bawah tebal. Judul center sempurna -->
+    <div class="header-wrapper">
+        <div class="logo-left">
+            <img src="imipas.png" alt="Kemenimipas" onerror="this.onerror=null; this.style.opacity='0.85';">
+        </div>
+        <div class="judul-utama">
+            <h2> LAPAS KELAS IIA CIKARANG</h2>
+            <h2> JAM MONITORING KUNJUNGAN TERPADU</h2>
+            <h2> RANCANGAN AKTUALISASI RICKY MARTIN</h2>
+        </div>
+        <div class="logo-right">
+            <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.onerror=null; this.style.opacity='0.85';">
+        </div>
+    </div>
+
+    <div class="form-area">
+        <input type="text" id="nama" placeholder="👤 Nama Pengunjung" autocomplete="off">
+        <input type="text" id="wbp" placeholder="🔒 Nama WBP / Tahanan" autocomplete="off">
+        <div class="btn-group">
+            <button onclick="tambahData()">➕ Tambahkan Antrian</button>
+            <button class="btn-repeat-last" onclick="ulangiPanggilanTerakhir()" title="Ulangi panggilan suara untuk antrian terakhir yang selesai">🔁 Ulangi Panggilan Terakhir</button>
+            <button class="btn-fullscreen" id="fullscreenBtn" onclick="toggleFullscreen()">🖥️ Full Layar</button>
+        </div>
+    </div>
+
+    <!-- Info total antrian dihilangkan -->
+    <div style="display: none;">
+        <span class="info-stats" id="info"></span>
+    </div>
+
+    <div class="table-wrapper" id="tableWrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th style="min-width: 70px;">No</th>
+                    <th style="min-width: 180px;">Nama Pengunjung</th>
+                    <th style="min-width: 180px;">Nama WBP/Tahanan</th>
+                    <th style="min-width: 160px;"> Waktu / Status</th>
+                    <th style="min-width: 110px;">⚙️ Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="tabelData"></tbody>
+        </table>
+    </div>
+
+    <div class="hapus-semua-wrapper">
+        <button id="btnHapusSemua" onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button>
+    </div>
+</div>
+
+<div id="notifikasi" style="display:none;"></div>
+
+<script>
+    let daftarData = JSON.parse(localStorage.getItem("dataKunjungan")) || [];
+    const waktuAwal = 1;           // durasi kunjungan MENIT (demo 1 menit)
+    let intervalTracker = [];
+    
+    // ANTRIAN SUARA (FIFO berdasarkan nomor urut)
+    let antrianSuara = [];
+    let sedangMemprosesSuara = false;
+
+    // MENYIMPAN PANGGILAN TERAKHIR (untuk tombol ulang)
+    let panggilanTerakhir = null;
+
+    function simpanData() { localStorage.setItem("dataKunjungan", JSON.stringify(daftarData)); }
+
+    function clearIntervalForIndex(index) { if (intervalTracker[index]) { clearInterval(intervalTracker[index]); intervalTracker[index] = null; } }
+
+    function tampilkanTabel() {
+        let tbody = document.getElementById("tabelData");
+        tbody.innerHTML = "";
+        daftarData.forEach((item, idx) => {
+            let statusHtml = "";
+            if (item.persiapan) {
+                statusHtml = `<span class="hijau timer-badge">⏳ PERSIAPAN (${item.waktuPersiapan}s)</span>`;
+            } 
+            else if (item.selesai) {
+                statusHtml = `<span class="merah timer-badge">✔️ SELESAI</span>`;
+            } 
+            else {
+                let menit = Math.floor(item.waktu / 60);
+                let detik = item.waktu % 60;
+                let waktuTeks = `${menit}:${detik.toString().padStart(2,'0')}`;
+                let warningClass = (item.waktu <= 10) ? "merah" : "";
+                statusHtml = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${waktuTeks}</span>`;
+            }
+            tbody.innerHTML += `
+                <tr>
+                    <td style="font-weight:600;">${idx+1}</td>
+                    <td>${escapeHtml(item.nama)}</td>
+                    <td>${escapeHtml(item.wbp)}</td>
+                    <td id="timer-${idx}">${statusHtml}</td>
+                    <td><button class="btn-hapus-satu" onclick="hapusData(${idx})">🗑 Hapus</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+    function rebuildAllTimers() {
+        for (let i = 0; i < intervalTracker.length; i++) if (intervalTracker[i]) clearInterval(intervalTracker[i]);
+        intervalTracker = [];
+        daftarData.forEach((item, index) => {
+            if (!item.selesai) mulaiTimer(index);
+        });
+    }
+
+    function playSuaraSekali(nomorUrut, nama, wbp) {
+        return new Promise((resolve) => {
+            let text = `Perhatian! Nomor antrian ${nomorUrut}, atas nama ${nama}, kunjungan untuk ${wbp}, waktu kunjungan telah habis. Silahkan Untuk bersiap-Siap meninggalkan ruangan kunjungan. Terimakasih.`;
+            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+            let speech = new SpeechSynthesisUtterance(text);
+            speech.lang = "id-ID";
+            speech.rate = 0.88;
+            speech.pitch = 1;
+            speech.volume = 1;
+            speech.onend = () => resolve();
+            speech.onerror = () => resolve();
+            window.speechSynthesis.speak(speech);
+        });
+    }
+
+    function tambahAntrianSuaraDuaKali(index, nama, wbp) {
+        const nomorUrut = index + 1;
+        antrianSuara.push({ index, nama, wbp, nomorUrut });
+        antrianSuara.push({ index, nama, wbp, nomorUrut });
+        antrianSuara.sort((a, b) => a.nomorUrut - b.nomorUrut);
+        panggilanTerakhir = { nomorUrut, nama, wbp, index };
+        prosesAntrianSuara();
+    }
+
+    async function prosesAntrianSuara() {
+        if (sedangMemprosesSuara) return;
+        if (antrianSuara.length === 0) return;
+        sedangMemprosesSuara = true;
+        const item = antrianSuara.shift();
+        await playSuaraSekali(item.nomorUrut, item.nama, item.wbp);
+        await new Promise(r => setTimeout(r, 500));
+        sedangMemprosesSuara = false;
+        prosesAntrianSuara();
+    }
+
+    async function ulangiPanggilanTerakhir() {
+        if (!panggilanTerakhir) {
+            const lastSelesai = [...daftarData].reverse().find(item => item.selesai === true);
+            if (lastSelesai) {
+                const idx = daftarData.findIndex(item => item === lastSelesai);
+                if (idx !== -1) {
+                    panggilanTerakhir = { nomorUrut: idx+1, nama: lastSelesai.nama, wbp: lastSelesai.wbp, index: idx };
+                } else {
+                    alert("⚠️ Belum ada antrian yang selesai.");
+                    return;
+                }
+            } else {
+                alert("⚠️ Belum ada panggilan suara otomatis. Tambahkan antrian dan biarkan waktu kunjungan habis.");
+                return;
+            }
+        }
+        const btn = document.querySelector('.btn-repeat-last');
+        if (btn) {
+            btn.style.transform = "scale(0.96)";
+            setTimeout(() => { if(btn) btn.style.transform = ""; }, 200);
+        }
+        await playSuaraSekali(panggilanTerakhir.nomorUrut, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+        let notifBox = document.getElementById("notifikasi");
+        if (notifBox) {
+            notifBox.innerHTML = `
+                <div class="notif-modern" style="background: linear-gradient(135deg, #2d5f3e, #1e4a2f); border-left-color: #a3e635;">
+                    <div class="notif-header"><span>🔊</span><strong>Panggilan Diulang</strong></div>
+                    <div class="notif-content">
+                        🧾 No. Antrian: <strong>${panggilanTerakhir.nomorUrut}</strong><br>
+                        👤 ${escapeHtml(panggilanTerakhir.nama)} → 🔒 ${escapeHtml(panggilanTerakhir.wbp)}
+                    </div>
+                </div>
+            `;
+            notifBox.style.display = "block";
+            setTimeout(() => { if (notifBox && notifBox.style.display === "block") notifBox.style.display = "none"; }, 3000);
+        }
+    }
+
+    function tampilkanNotifikasi(index, data) {
+        let notifBox = document.getElementById("notifikasi");
+        if (!notifBox) return;
+        notifBox.innerHTML = `
+            <div class="notif-modern">
+                <div class="notif-header"><span>⏰</span><strong>WAKTU KUNJUNGAN HABIS</strong></div>
+                <div class="notif-content">
+                    🧾 No. Antrian: <strong>${index+1}</strong><br>
+                    👤 ${escapeHtml(data.nama)} → 🔒 ${escapeHtml(data.wbp)}
+                    <div style="margin-top: 8px; font-size: 0.75rem;">🔔 Panggilan suara akan diulang 2 kali.</div>
+                </div>
+            </div>
+        `;
+        notifBox.style.display = "block";
+        setTimeout(() => { if (notifBox) notifBox.style.display = "none"; }, 10000);
+    }
+
+    function tambahData() {
+        let nama = document.getElementById("nama").value.trim();
+        let wbp = document.getElementById("wbp").value.trim();
+        if (!nama || !wbp) { alert("⚠️ Form tidak boleh kosong!"); return; }
+        if (daftarData.length >= 35) { alert("⚠️ Antrian maksimal 35 data."); return; }
+        daftarData.push({
+            nama, wbp,
+            waktu: waktuAwal,
+            selesai: false,
+            persiapan: true,
+            waktuPersiapan: 10,
+        });
+        simpanData();
+        tampilkanTabel();
+        const newIndex = daftarData.length - 1;
+        mulaiTimer(newIndex);
+        document.getElementById("nama").value = "";
+        document.getElementById("wbp").value = "";
+    }
+
+    function hapusData(index) {
+        if (confirm(`❌ Hapus antrian untuk "${daftarData[index]?.nama}" ?`)) {
+            clearIntervalForIndex(index);
+            daftarData.splice(index, 1);
+            rebuildAllTimers();
+            simpanData();
+            tampilkanTabel();
+        }
+    }
+
+    function hapusSemuaData() {
+        if (confirm("⚠️ Hapus SEMUA data?")) {
+            for (let i = 0; i < intervalTracker.length; i++) if (intervalTracker[i]) clearInterval(intervalTracker[i]);
+            intervalTracker = [];
+            antrianSuara = [];
+            sedangMemprosesSuara = false;
+            panggilanTerakhir = null;
+            daftarData = [];
+            simpanData();
+            tampilkanTabel();
+        }
+    }
+
+    function mulaiTimer(index) {
+        if (intervalTracker[index]) { clearInterval(intervalTracker[index]); intervalTracker[index] = null; }
+        let data = daftarData[index];
+        if (!data || data.selesai) return;
+
+        const intervalId = setInterval(() => {
+            if (!daftarData[index] || daftarData[index].selesai) {
+                if (intervalTracker[index]) clearInterval(intervalTracker[index]);
+                intervalTracker[index] = null;
+                return;
+            }
+
+            let currentData = daftarData[index];
+            let timerCell = document.getElementById(`timer-${index}`);
+
+            if (currentData.persiapan) {
+                if (currentData.waktuPersiapan > 0) {
+                    currentData.waktuPersiapan--;
+                    if (timerCell) timerCell.innerHTML = `<span class="hijau timer-badge">⏳ PERSIAPAN (${currentData.waktuPersiapan}s)</span>`;
+                    simpanData();
+                } else {
+                    currentData.persiapan = false;
+                    currentData.waktu = waktuAwal * 60;
+                    simpanData();
+                    if (timerCell) {
+                        let menit = Math.floor(currentData.waktu / 60);
+                        let detik = currentData.waktu % 60;
+                        timerCell.innerHTML = `<span class="timer-badge">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
+                    }
+                }
+                return;
+            }
+
+            if (currentData.waktu > 0 && !currentData.selesai) {
+                currentData.waktu--;
+                let menit = Math.floor(currentData.waktu / 60);
+                let detik = currentData.waktu % 60;
+                if (timerCell) {
+                    let warningClass = (currentData.waktu <= 10) ? "merah" : "";
+                    timerCell.innerHTML = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
+                }
+                simpanData();
+            } 
+            else if (!currentData.selesai && currentData.waktu <= 0 && !currentData.persiapan) {
+                clearInterval(intervalId);
+                intervalTracker[index] = null;
+                currentData.selesai = true;
+                simpanData();
+                if (timerCell) {
+                    timerCell.innerHTML = `<span class="merah timer-badge">✔️ SELESAI</span>`;
+                }
+                tambahAntrianSuaraDuaKali(index, currentData.nama, currentData.wbp);
+                tampilkanNotifikasi(index, currentData);
+                tampilkanTabel();
+            }
+        }, 1000);
+        intervalTracker[index] = intervalId;
+    }
+
+    function toggleFullscreen() {
+        const container = document.getElementById("mainContainer");
+        container.classList.toggle("fullscreen");
+        const btn = document.getElementById("fullscreenBtn");
+        if (container.classList.contains("fullscreen")) {
+            btn.innerHTML = "🗗 Keluar Full Layar";
+            btn.style.background = "#9b2c2c";
+        } else {
+            btn.innerHTML = "🖥️ Full Layar";
+            btn.style.background = "#6b21a5";
+        }
+    }
+
+    window.onload = function() {
+        tampilkanTabel();
+        for (let i = 0; i < daftarData.length; i++) {
+            const item = daftarData[i];
+            if (!item.selesai && item.persiapan && item.waktuPersiapan <= 0) {
+                item.persiapan = false;
+                item.waktu = waktuAwal * 60;
+                simpanData();
+            }
+            if (!item.selesai && !item.persiapan && item.waktu <= 0) {
+                item.selesai = true;
+                simpanData();
+                tambahAntrianSuaraDuaKali(i, item.nama, item.wbp);
+            }
+            if (!item.selesai) mulaiTimer(i);
+        }
+
+        const inputNama = document.getElementById("nama"), inputWbp = document.getElementById("wbp");
+        function handleEnter(e) { if (e.key === 'Enter') { e.preventDefault(); tambahData(); } }
+        inputNama.addEventListener("keypress", handleEnter);
+        inputWbp.addEventListener("keypress", handleEnter);
+    };
+</script>
+</body>
+</html>
+```
