@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Input Antrian - Lapas Cikarang</title>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <title>Jamkot | Input Antrian - Lapas Cikarang</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', system-ui;
+            font-family: 'Segoe UI', 'Poppins', system-ui;
             min-height: 100vh;
             padding: 30px 20px;
-            background: #0f2c38;
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+            background-color: #0f2c38;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -26,7 +27,7 @@
             box-shadow: 0 25px 45px rgba(0,0,0,0.3);
         }
         .logo-area { text-align: center; margin-bottom: 20px; }
-        .logo-area img { height: 70px; }
+        .logo-area img { height: 70px; margin: 0 5px; }
         .judul { text-align: center; margin-bottom: 30px; }
         .judul h2 { color: #1e3c4a; border-left: 6px solid #facc15; display: inline-block; padding: 0 20px; }
         .form-group { margin-bottom: 20px; }
@@ -38,6 +39,7 @@
             border-radius: 60px;
             font-size: 1rem;
         }
+        .form-group input:focus { border-color: #2a7f62; outline: none; }
         .btn-group { display: flex; gap: 15px; margin-top: 20px; }
         button {
             flex: 1;
@@ -46,10 +48,12 @@
             font-weight: 700;
             border: none;
             cursor: pointer;
+            transition: 0.2s;
         }
         .btn-simpan { background: #2a7f62; color: white; }
         .btn-back { background: #475569; color: white; }
-        .info-antrian { background: #f1f5f9; border-radius: 2rem; padding: 12px; text-align: center; margin-top: 20px; }
+        button:hover { transform: translateY(-2px); filter: brightness(1.05); }
+        .info-antrian { background: #f1f5f9; border-radius: 2rem; padding: 12px; text-align: center; margin-top: 20px; font-weight: 600; }
         .notif-sukses {
             position: fixed;
             bottom: 20px;
@@ -61,88 +65,103 @@
             border-radius: 60px;
             text-align: center;
             z-index: 1000;
+            max-width: 400px;
+            margin: 0 auto;
         }
     </style>
 </head>
 <body>
 <div class="card-input">
-    <div class="logo-area"><img src="https://via.placeholder.com/70?text=Kemenimipas" alt="Logo"></div>
-    <div class="judul"><h2>📋 TAMBAH ANTRIAN</h2><p>Lapas Kelas IIA Cikarang</p></div>
-    <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder=""></div>
-    <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder=""></div>
-    <div class="btn-group">
-        <button class="btn-simpan" onclick="tambahAntrian()">✅ Simpan Antrian</button>
-        <button class="btn-back" onclick="window.location.href='index.html'">← Dashboard</button>
+    <div class="logo-area">
+        <img src="imipas.png" alt="Kemenimipas" onerror="this.style.display='none'">
+        <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display='none'">
     </div>
+    <div class="judul"><h2>📋 TAMBAH ANTRIAN</h2><p>Lapas Kelas IIA Cikarang</p></div>
+    <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="Nama lengkap pengunjung"></div>
+    <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="Nama WBP" autocomplete="off"></div>
+    <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
     <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
 </div>
 <div id="notifTemp"></div>
 
-<script>
-    // KONFIGURASI SAMA PERSIS DENGAN INDEX.HTML (termasuk databaseURL)
+<!-- FIREBASE MODULE -->
+<script type="module">
+    // ==================== KONFIGURASI FIREBASE (GANTI DENGAN PUNYA ANDA) ====================
     const firebaseConfig = {
-        apiKey: "AIzaSyBmWTuBg0PBpZSEWNJUm9pJwEQuV03O2MY",
-        authDomain: "antrian-lapas-cikarang.firebaseapp.com",
-        databaseURL: "https://antrian-lapas-cikarang-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "antrian-lapas-cikarang",
-        storageBucket: "antrian-lapas-cikarang.firebasestorage.app",
-        messagingSenderId: "283658990470",
-        appId: "1:283658990470:web:351606d22d74777586b207",
-        measurementId: "G-CDJR3PEH53"
+       apiKey: "AIzaSyDpl7Pv6EMOgwhJ3p5zkX3RUDn5Y6T2qYI",
+  authDomain: "antrian-lapas-cikarang-13bb0.firebaseapp.com",
+  projectId: "antrian-lapas-cikarang-13bb0",
+  storageBucket: "antrian-lapas-cikarang-13bb0.firebasestorage.app",
+  messagingSenderId: "816635529186",
+  appId: "1:816635529186:web:e13e6b271eaa1c540e5bbb",
+  measurementId: "G-4KK3QL14BX"
     };
 
-    // Inisialisasi Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    const antrianRef = database.ref('antrian');
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    function loadJumlahAntrian() {
-        antrianRef.once('value', (snapshot) => {
-            const data = snapshot.val();
-            const jumlah = data ? Object.keys(data).length : 0;
-            document.getElementById('infoAntrian').innerHTML = `📊 Total antrian saat ini: ${jumlah} orang`;
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const antrianRef = ref(db, 'antrian');
+
+    // Update jumlah antrian di info box
+    function updateJumlahAntrian() {
+        get(antrianRef).then((snapshot) => {
+            let count = 0;
+            snapshot.forEach(() => count++);
+            document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${count} orang`;
+        }).catch(() => {
+            document.getElementById("infoAntrian").innerHTML = "⚠️ Gagal memuat data";
         });
     }
 
-    function tambahAntrian() {
-        let nama = document.getElementById('namaPengunjung').value.trim();
-        let wbp = document.getElementById('namaWbp').value.trim();
-        if (!nama || !wbp) {
+    window.tambahAntrianBaru = async function() {
+        let nama = document.getElementById("namaPengunjung").value.trim();
+        let wbp = document.getElementById("namaWbp").value.trim();
+        if(!nama || !wbp) {
             tampilNotif("⚠️ Kedua field harus diisi!", true);
             return;
         }
-        const newAntrian = {
+        const newData = {
             nama: nama,
             wbp: wbp,
+            waktu: 0,
+            selesai: false,
             persiapan: true,
             waktuPersiapan: 10,
-            selesai: false,
-            waktu: 0,
             timestamp: Date.now()
         };
-        antrianRef.push(newAntrian).then(() => {
+        try {
+            await push(antrianRef, newData);
             tampilNotif(`✅ Antrian ditambahkan! ${nama} → ${wbp}`);
-            document.getElementById('namaPengunjung').value = '';
-            document.getElementById('namaWbp').value = '';
-            loadJumlahAntrian();
-        }).catch(err => {
-            tampilNotif("Gagal menyimpan: " + err.message, true);
-        });
-    }
+            document.getElementById("namaPengunjung").value = "";
+            document.getElementById("namaWbp").value = "";
+            document.getElementById("namaPengunjung").focus();
+            updateJumlahAntrian();
+        } catch(e) {
+            tampilNotif("❌ Gagal simpan ke server", true);
+        }
+    };
 
-    function tampilNotif(pesan, isError = false) {
-        let div = document.createElement('div');
-        div.className = 'notif-sukses';
-        div.style.background = isError ? '#b91c1c' : '#0e7c32';
+    window.kembaliKeDashboard = function() {
+        window.location.href = './Jamkot0.html';
+    };
+
+    function tampilNotif(pesan, isError=false) {
+        let div = document.createElement("div");
+        div.className = "notif-sukses";
+        div.style.background = isError ? "#b91c1c" : "#0e7c32";
         div.innerText = pesan;
-        let container = document.getElementById('notifTemp');
-        container.innerHTML = '';
+        let container = document.getElementById("notifTemp");
+        container.innerHTML = "";
         container.appendChild(div);
         setTimeout(() => div.remove(), 3000);
     }
 
-    loadJumlahAntrian();
-    setInterval(loadJumlahAntrian, 5000);
+    // Load awal
+    updateJumlahAntrian();
+    // Update setiap 3 detik
+    setInterval(updateJumlahAntrian, 3000);
 </script>
 </body>
 </html>
