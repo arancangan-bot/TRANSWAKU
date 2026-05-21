@@ -5,6 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Jamkot | Sistem Kunjungan Otomatis - Lapas Cikarang</title>
     <style>
+         <script type="module">
+import { initializeApp } from "https://console.firebase.google.com/u/3/project/jamkot-73af5/database/jamkot-73af5-default-rtdb/data/~2F";
+
+import {
+  getDatabase,
+  ref,
+  push,
+  onValue
+} from "https://console.firebase.google.com/u/3/project/jamkot-73af5/database/jamkot-73af5-default-rtdb/data/~2F";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBfe6l1oz-oHEnIpExWf7L_c7WOVAQGz3U",
+  authDomain: "jamkot-73af5.firebaseapp.com",
+  databaseURL: "https://jamkot-73af5-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "jamkot-73af5",
+  storageBucket: "jamkot-73af5.firebasestorage.app",
+  messagingSenderId: "920727142933",
+  appId: "1:920727142933:web:2fe747a74d76873e61041c",
+  measurementId: "G-93MKKF2F2B"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+</script>
         * {
             margin: 0;
             padding: 0;
