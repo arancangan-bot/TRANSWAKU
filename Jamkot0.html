@@ -137,11 +137,11 @@
 <div class="auto-refresh-badge" id="refreshIndicator">🔄 Sinkron realtime</div>
 
 <script type="module">
-    // ==================== KONFIGURASI FIREBASE (SUDAH DENGAN databaseURL) ====================
+    // ==================== KONFIGURASI FIREBASE ====================
     const firebaseConfig = {
         apiKey: "AIzaSyCAmnu2YFewAm07IJ1a2_lN4N3i-TL5hAM",
         authDomain: "transwaku-e0fc6.firebaseapp.com",
-        databaseURL: "https://transwaku-e0fc6-default-rtdb.firebaseio.com",  // ← TELAH DITAMBAHKAN
+        databaseURL: "https://transwaku-e0fc6-default-rtdb.firebaseio.com",
         projectId: "transwaku-e0fc6",
         storageBucket: "transwaku-e0fc6.firebasestorage.app",
         messagingSenderId: "797562598719",
@@ -153,7 +153,9 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const antrianRef = ref(db, 'antrian');
+    
+    // ** PERUBAHAN: PATH 'antrian' diganti menjadi 'kunjungan' **
+    const kunjunganRef = ref(db, 'kunjungan');
 
     // Variabel global
     let daftarData = [];
@@ -165,9 +167,9 @@
     let suaraPerempuan = null;
     const DURASI_MENIT = 1;
 
-    // ======================== FIRESTORE REALTIME ========================
+    // ======================== FIREBASE REALTIME ========================
     function bindFirebaseRealtime() {
-        onValue(antrianRef, (snapshot) => {
+        onValue(kunjunganRef, (snapshot) => {
             const newData = [];
             const newKeys = [];
             snapshot.forEach((childSnapshot) => {
@@ -194,7 +196,8 @@
 
     async function updateItemToFirebase(index, updatedFields) {
         if (!dataKeys[index]) return;
-        const itemRef = ref(db, `antrian/${dataKeys[index]}`);
+        // PERUBAHAN: path menggunakan 'kunjungan'
+        const itemRef = ref(db, `kunjungan/${dataKeys[index]}`);
         await update(itemRef, updatedFields);
     }
 
@@ -380,7 +383,8 @@
         if (!dataKeys[index]) return;
         if (confirm(`Hapus antrian untuk ${daftarData[index]?.nama}?`)) {
             if (intervalTracker[index]) clearInterval(intervalTracker[index]);
-            const itemRef = ref(db, `antrian/${dataKeys[index]}`);
+            // PERUBAHAN: path menggunakan 'kunjungan'
+            const itemRef = ref(db, `kunjungan/${dataKeys[index]}`);
             await remove(itemRef);
         }
     };
@@ -388,7 +392,8 @@
     window.hapusSemuaData = async function() {
         if (confirm("Hapus SEMUA data antrian?")) {
             resetSemuaTimerDanSuara();
-            await set(antrianRef, null);
+            // PERUBAHAN: gunakan kunjunganRef
+            await set(kunjunganRef, null);
         }
     };
 
