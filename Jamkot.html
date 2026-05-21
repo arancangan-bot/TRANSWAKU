@@ -1,9 +1,12 @@
-     <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Jamkot | Sistem Kunjungan Otomatis - Lapas Cikarang</title>
+    <!-- Firebase SDK (Realtime Database) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -15,7 +18,6 @@
             font-family: 'Segoe UI', 'Poppins', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
             min-height: 100vh;
             padding: 30px 20px 60px 20px;
-            /* BACKGROUND LANGSUNG TANPA OVERLAY TRANSPARAN */
             background-image: url('background.png');
             background-attachment: fixed;
             background-size: cover;
@@ -35,7 +37,6 @@
             transition: all 0.3s ease;
         }
 
-        /* Fullscreen mode */
         .main-container.fullscreen {
             position: fixed;
             top: 0;
@@ -53,7 +54,6 @@
             max-height: calc(100vh - 280px);
         }
 
-        /* ========= HEADER DENGAN GAMBAR BACKGROUND LANGSUNG, TANPA LAPISAN TRANSPARAN ========= */
         .header-wrapper {
             display: flex;
             align-items: center;
@@ -61,20 +61,14 @@
             flex-wrap: wrap;
             margin-bottom: 0;
             padding-bottom: 15px;
-            
-            /* GARIS TEBAL DI BAWAH 3 KALIMAT DAN 2 LOGO */
             border-bottom: 4px solid #facc15;
-            
-            /* BACKGROUND LANGSUNG GAMBAR (tanpa overlay apapun) */
             background-image: url('background.png');
             background-size: cover;
             background-position: center 30%;
             background-repeat: no-repeat;
-            
             border-radius: 24px 24px 0 0;
         }
         
-        /* Area logo dan judul: tidak ada background gelap */
         .logo-left, .logo-right {
             flex-shrink: 0;
             display: flex;
@@ -83,14 +77,12 @@
             padding: 8px 16px;
         }
         
-        /* Judul utama dipaksa berada di tengah secara sempurna */
         .judul-utama {
             text-align: center;
             flex: 1;
             padding: 8px 16px;
         }
         
-        /* Teks judul dikontraskan dengan text-shadow solid */
         .judul-utama h2 {
             text-shadow: 2px 2px 5px #000000;
             font-weight: 800;
@@ -101,9 +93,6 @@
         .judul-utama h2:first-child {
             font-size: 1.5rem;
             color: #FFE484;
-            background: none;
-            -webkit-background-clip: unset;
-            background-clip: unset;
             text-shadow: 2px 2px 4px black;
         }
         .judul-utama h2:nth-child(2) {
@@ -118,7 +107,6 @@
             text-shadow: 2px 2px 4px black;
         }
         
-        /* Logo tetap dengan filter bayangan agar kontras */
         .logo-left img, .logo-right img {
             filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
             height: 100px;
@@ -177,11 +165,6 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
         .btn-fullscreen:hover { background: #581c87; }
-
-        /* Info statistik disembunyikan */
-        .info-stats {
-            display: none;
-        }
 
         .table-wrapper {
             overflow-x: auto;
@@ -263,7 +246,6 @@
             background: #0f3557;
         }
 
-        /* Responsive: judul tetap center meski logo turun ke bawah */
         @media (max-width: 850px) {
             .header-wrapper {
                 flex-direction: column;
@@ -277,7 +259,7 @@
             .judul-utama h2:last-child { font-size: 1rem; }
             .judul-utama {
                 width: 100%;
-                order: 2; /* agar judul tetap di tengah saat kolom */
+                order: 2;
             }
             .logo-left, .logo-right {
                 order: 1;
@@ -302,7 +284,6 @@
 <body>
 
 <div class="main-container" id="mainContainer">
-    <!-- HEADER: background gambar langsung, tanpa transparan, garis bawah tebal. Judul center sempurna -->
     <div class="header-wrapper">
         <div class="logo-left">
             <img src="imipas.png" alt="Kemenimipas" onerror="this.onerror=null; this.style.opacity='0.85';">
@@ -327,11 +308,6 @@
         </div>
     </div>
 
-    <!-- Info total antrian dihilangkan -->
-    <div style="display: none;">
-        <span class="info-stats" id="info"></span>
-    </div>
-
     <div class="table-wrapper" id="tableWrapper">
         <table>
             <thead>
@@ -351,65 +327,217 @@
         <button id="btnHapusSemua" onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button>
     </div>
 </div>
-
 <div id="notifikasi" style="display:none;"></div>
 
 <script>
-    let daftarData = JSON.parse(localStorage.getItem("dataKunjungan")) || [];
-    const waktuAwal = 1;           // durasi kunjungan MENIT (demo 1 menit)
-    let intervalTracker = [];
-    
-    // ANTRIAN SUARA (FIFO berdasarkan nomor urut)
-    let antrianSuara = [];
+    // ======================= KONFIGURASI FIREBASE =======================
+    const firebaseConfig = {
+        apiKey: "AIzaSyCAmnu2YFewAm07IJ1a2_lN4N3i-TL5hAM",
+        authDomain: "transwaku-e0fc6.firebaseapp.com",
+        projectId: "transwaku-e0fc6",
+        storageBucket: "transwaku-e0fc6.firebasestorage.app",
+        messagingSenderId: "797562598719",
+        appId: "1:797562598719:web:5143263044366af884cf8a",
+        measurementId: "G-VDRGT0JCMG"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const dbRef = database.ref('kunjungan');  // data akan disimpan di path 'kunjungan'
+
+    // ======================= VARIABEL GLOBAL =======================
+    let daftarData = [];            // array item antrian
+    let timerInterval = null;       // interval global untuk update tampilan waktu
+    let antrianSuara = [];          // antrian panggilan suara (FIFO)
     let sedangMemprosesSuara = false;
+    let panggilanTerakhir = null;   // untuk tombol ulang
 
-    // MENYIMPAN PANGGILAN TERAKHIR (untuk tombol ulang)
-    let panggilanTerakhir = null;
+    // Durasi dalam DETIK
+    const DURASI_PERSIAPAN = 10;    // 10 detik persiapan
+    const DURASI_KUNJUNGAN = 60;    // 1 menit
 
-    function simpanData() { localStorage.setItem("dataKunjungan", JSON.stringify(daftarData)); }
+    // ======================= FUNGSI BANTU =======================
+    function escapeHtml(str) {
+        if (!str) return "";
+        return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+    }
 
-    function clearIntervalForIndex(index) { if (intervalTracker[index]) { clearInterval(intervalTracker[index]); intervalTracker[index] = null; } }
+    // Hitung sisa waktu persiapan (detik), jika sudah habis return 0
+    function sisaWaktuPersiapan(item) {
+        if (item.status !== 'persiapan') return 0;
+        const elapsed = (Date.now() - item.waktuPersiapanMulai) / 1000;
+        const remaining = item.durasiPersiapan - elapsed;
+        return remaining > 0 ? Math.floor(remaining) : 0;
+    }
 
+    // Hitung sisa waktu kunjungan (detik), jika sudah habis return 0
+    function sisaWaktuKunjungan(item) {
+        if (item.status !== 'berlangsung') return 0;
+        const elapsed = (Date.now() - item.waktuMulai) / 1000;
+        const remaining = item.durasiKunjungan - elapsed;
+        return remaining > 0 ? Math.floor(remaining) : 0;
+    }
+
+    // Perbarui status berdasarkan waktu (dipanggil setiap detik)
+    function updateStatusBerdasarkanWaktu() {
+        let adaPerubahan = false;
+        for (let i = 0; i < daftarData.length; i++) {
+            const item = daftarData[i];
+            if (item.status === 'persiapan') {
+                if (sisaWaktuPersiapan(item) <= 0) {
+                    // Pindah ke status berlangsung
+                    item.status = 'berlangsung';
+                    item.waktuMulai = Date.now();
+                    item.durasiKunjungan = DURASI_KUNJUNGAN;
+                    adaPerubahan = true;
+                }
+            } else if (item.status === 'berlangsung') {
+                if (sisaWaktuKunjungan(item) <= 0) {
+                    // Kunjungan selesai
+                    item.status = 'selesai';
+                    adaPerubahan = true;
+                    // Panggil suara 2x dan notifikasi
+                    tambahAntrianSuaraDuaKali(i, item.nama, item.wbp);
+                    tampilkanNotifikasi(i, item);
+                }
+            }
+        }
+        if (adaPerubahan) {
+            simpanKeFirebase();    // sinkronkan perubahan status ke semua perangkat
+        }
+        tampilkanTabel();          // refresh UI
+    }
+
+    // ======================= FUNGSI UI & TIMER =======================
     function tampilkanTabel() {
         let tbody = document.getElementById("tabelData");
+        if (!tbody) return;
         tbody.innerHTML = "";
         daftarData.forEach((item, idx) => {
             let statusHtml = "";
-            if (item.persiapan) {
-                statusHtml = `<span class="hijau timer-badge">⏳ PERSIAPAN (${item.waktuPersiapan}s)</span>`;
+            if (item.status === 'persiapan') {
+                let sisa = sisaWaktuPersiapan(item);
+                statusHtml = `<span class="hijau timer-badge">⏳ PERSIAPAN (${sisa}s)</span>`;
             } 
-            else if (item.selesai) {
+            else if (item.status === 'selesai') {
                 statusHtml = `<span class="merah timer-badge">✔️ SELESAI</span>`;
             } 
-            else {
-                let menit = Math.floor(item.waktu / 60);
-                let detik = item.waktu % 60;
-                let waktuTeks = `${menit}:${detik.toString().padStart(2,'0')}`;
-                let warningClass = (item.waktu <= 10) ? "merah" : "";
-                statusHtml = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${waktuTeks}</span>`;
+            else { // berlangsung
+                let sisa = sisaWaktuKunjungan(item);
+                let menit = Math.floor(sisa / 60);
+                let detik = sisa % 60;
+                let warningClass = (sisa <= 10) ? "merah" : "";
+                statusHtml = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
             }
             tbody.innerHTML += `
                 <tr>
                     <td style="font-weight:600;">${idx+1}</td>
                     <td>${escapeHtml(item.nama)}</td>
                     <td>${escapeHtml(item.wbp)}</td>
-                    <td id="timer-${idx}">${statusHtml}</td>
+                    <td>${statusHtml}</td>
                     <td><button class="btn-hapus-satu" onclick="hapusData(${idx})">🗑 Hapus</button></td>
                 </tr>
             `;
         });
     }
 
-    function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+    // Memulai interval global (setiap 1 detik)
+    function startGlobalTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            updateStatusBerdasarkanWaktu();
+        }, 1000);
+    }
 
-    function rebuildAllTimers() {
-        for (let i = 0; i < intervalTracker.length; i++) if (intervalTracker[i]) clearInterval(intervalTracker[i]);
-        intervalTracker = [];
-        daftarData.forEach((item, index) => {
-            if (!item.selesai) mulaiTimer(index);
+    // ======================= FIREBASE SYNC =======================
+    // Simpan daftarData ke Firebase (seluruh array)
+    function simpanKeFirebase() {
+        dbRef.set(daftarData).catch(err => console.error("Gagal simpan ke Firebase:", err));
+        // simpan juga ke localStorage sebagai cache
+        localStorage.setItem("dataKunjungan", JSON.stringify(daftarData));
+    }
+
+    // Load data dari Firebase (pertama kali dan setiap ada perubahan dari luar)
+    function loadDariFirebase() {
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && Array.isArray(data)) {
+                // Hindari overwrite jika data sama persis (optional)
+                daftarData = data;
+                // Pastikan setiap item memiliki properti default jika ada field baru
+                for (let i = 0; i < daftarData.length; i++) {
+                    const item = daftarData[i];
+                    if (!item.hasOwnProperty('durasiPersiapan')) item.durasiPersiapan = DURASI_PERSIAPAN;
+                    if (!item.hasOwnProperty('durasiKunjungan')) item.durasiKunjungan = DURASI_KUNJUNGAN;
+                    if (!item.hasOwnProperty('status')) item.status = 'persiapan';
+                    if (item.status === 'persiapan' && !item.waktuPersiapanMulai) item.waktuPersiapanMulai = Date.now();
+                    if (item.status === 'berlangsung' && !item.waktuMulai) item.waktuMulai = Date.now();
+                }
+                localStorage.setItem("dataKunjungan", JSON.stringify(daftarData));
+                tampilkanTabel();
+            } else {
+                // Jika Firebase kosong, coba ambil dari localStorage
+                const lokal = localStorage.getItem("dataKunjungan");
+                if (lokal) {
+                    daftarData = JSON.parse(lokal);
+                    simpanKeFirebase(); // dorong ke Firebase
+                } else {
+                    daftarData = [];
+                }
+                tampilkanTabel();
+            }
+        }, (error) => {
+            console.error("Gagal baca Firebase:", error);
+            // fallback ke localStorage
+            const lokal = localStorage.getItem("dataKunjungan");
+            if (lokal) daftarData = JSON.parse(lokal);
+            tampilkanTabel();
         });
     }
 
+    // ======================= MANIPULASI DATA =======================
+    function tambahData() {
+        let nama = document.getElementById("nama").value.trim();
+        let wbp = document.getElementById("wbp").value.trim();
+        if (!nama || !wbp) { alert("⚠️ Form tidak boleh kosong!"); return; }
+        if (daftarData.length >= 35) { alert("⚠️ Antrian maksimal 35 data."); return; }
+        
+        const newItem = {
+            nama: nama,
+            wbp: wbp,
+            status: 'persiapan',
+            waktuPersiapanMulai: Date.now(),
+            durasiPersiapan: DURASI_PERSIAPAN,
+            durasiKunjungan: DURASI_KUNJUNGAN
+        };
+        daftarData.push(newItem);
+        simpanKeFirebase();
+        tampilkanTabel();
+        // reset form
+        document.getElementById("nama").value = "";
+        document.getElementById("wbp").value = "";
+    }
+
+    function hapusData(index) {
+        if (confirm(`❌ Hapus antrian untuk "${daftarData[index]?.nama}" ?`)) {
+            daftarData.splice(index, 1);
+            simpanKeFirebase();
+            tampilkanTabel();
+        }
+    }
+
+    function hapusSemuaData() {
+        if (confirm("⚠️ Hapus SEMUA data?")) {
+            daftarData = [];
+            simpanKeFirebase();
+            tampilkanTabel();
+            // Kosongkan antrian suara
+            antrianSuara = [];
+            sedangMemprosesSuara = false;
+            panggilanTerakhir = null;
+        }
+    }
+
+    // ======================= FUNGSI SUARA & NOTIFIKASI =======================
     function playSuaraSekali(nomorUrut, nama, wbp) {
         return new Promise((resolve) => {
             let text = `Perhatian! Nomor antrian ${nomorUrut}, atas nama ${nama}, kunjungan untuk ${wbp}, waktu kunjungan telah habis. Silahkan Untuk bersiap-Siap meninggalkan ruangan kunjungan. Terimakasih.`;
@@ -427,9 +555,10 @@
 
     function tambahAntrianSuaraDuaKali(index, nama, wbp) {
         const nomorUrut = index + 1;
-        antrianSuara.push({ index, nama, wbp, nomorUrut });
-        antrianSuara.push({ index, nama, wbp, nomorUrut });
-        antrianSuara.sort((a, b) => a.nomorUrut - b.nomorUrut);
+        antrianSuara.push({ nomorUrut, nama, wbp });
+        antrianSuara.push({ nomorUrut, nama, wbp });
+        // urutkan berdasarkan nomor (tidak wajib, karena antrian FIFO, tapi biar rapi)
+        antrianSuara.sort((a,b) => a.nomorUrut - b.nomorUrut);
         panggilanTerakhir = { nomorUrut, nama, wbp, index };
         prosesAntrianSuara();
     }
@@ -447,7 +576,8 @@
 
     async function ulangiPanggilanTerakhir() {
         if (!panggilanTerakhir) {
-            const lastSelesai = [...daftarData].reverse().find(item => item.selesai === true);
+            // cari data terakhir yang selesai
+            const lastSelesai = [...daftarData].reverse().find(item => item.status === 'selesai');
             if (lastSelesai) {
                 const idx = daftarData.findIndex(item => item === lastSelesai);
                 if (idx !== -1) {
@@ -479,7 +609,7 @@
                 </div>
             `;
             notifBox.style.display = "block";
-            setTimeout(() => { if (notifBox && notifBox.style.display === "block") notifBox.style.display = "none"; }, 3000);
+            setTimeout(() => { if (notifBox) notifBox.style.display = "none"; }, 3000);
         }
     }
 
@@ -500,108 +630,7 @@
         setTimeout(() => { if (notifBox) notifBox.style.display = "none"; }, 10000);
     }
 
-    function tambahData() {
-        let nama = document.getElementById("nama").value.trim();
-        let wbp = document.getElementById("wbp").value.trim();
-        if (!nama || !wbp) { alert("⚠️ Form tidak boleh kosong!"); return; }
-        if (daftarData.length >= 35) { alert("⚠️ Antrian maksimal 35 data."); return; }
-        daftarData.push({
-            nama, wbp,
-            waktu: waktuAwal,
-            selesai: false,
-            persiapan: true,
-            waktuPersiapan: 10,
-        });
-        simpanData();
-        tampilkanTabel();
-        const newIndex = daftarData.length - 1;
-        mulaiTimer(newIndex);
-        document.getElementById("nama").value = "";
-        document.getElementById("wbp").value = "";
-    }
-
-    function hapusData(index) {
-        if (confirm(`❌ Hapus antrian untuk "${daftarData[index]?.nama}" ?`)) {
-            clearIntervalForIndex(index);
-            daftarData.splice(index, 1);
-            rebuildAllTimers();
-            simpanData();
-            tampilkanTabel();
-        }
-    }
-
-    function hapusSemuaData() {
-        if (confirm("⚠️ Hapus SEMUA data?")) {
-            for (let i = 0; i < intervalTracker.length; i++) if (intervalTracker[i]) clearInterval(intervalTracker[i]);
-            intervalTracker = [];
-            antrianSuara = [];
-            sedangMemprosesSuara = false;
-            panggilanTerakhir = null;
-            daftarData = [];
-            simpanData();
-            tampilkanTabel();
-        }
-    }
-
-    function mulaiTimer(index) {
-        if (intervalTracker[index]) { clearInterval(intervalTracker[index]); intervalTracker[index] = null; }
-        let data = daftarData[index];
-        if (!data || data.selesai) return;
-
-        const intervalId = setInterval(() => {
-            if (!daftarData[index] || daftarData[index].selesai) {
-                if (intervalTracker[index]) clearInterval(intervalTracker[index]);
-                intervalTracker[index] = null;
-                return;
-            }
-
-            let currentData = daftarData[index];
-            let timerCell = document.getElementById(`timer-${index}`);
-
-            if (currentData.persiapan) {
-                if (currentData.waktuPersiapan > 0) {
-                    currentData.waktuPersiapan--;
-                    if (timerCell) timerCell.innerHTML = `<span class="hijau timer-badge">⏳ PERSIAPAN (${currentData.waktuPersiapan}s)</span>`;
-                    simpanData();
-                } else {
-                    currentData.persiapan = false;
-                    currentData.waktu = waktuAwal * 60;
-                    simpanData();
-                    if (timerCell) {
-                        let menit = Math.floor(currentData.waktu / 60);
-                        let detik = currentData.waktu % 60;
-                        timerCell.innerHTML = `<span class="timer-badge">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
-                    }
-                }
-                return;
-            }
-
-            if (currentData.waktu > 0 && !currentData.selesai) {
-                currentData.waktu--;
-                let menit = Math.floor(currentData.waktu / 60);
-                let detik = currentData.waktu % 60;
-                if (timerCell) {
-                    let warningClass = (currentData.waktu <= 10) ? "merah" : "";
-                    timerCell.innerHTML = `<span class="timer-badge ${warningClass}" style="font-weight:bold;">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
-                }
-                simpanData();
-            } 
-            else if (!currentData.selesai && currentData.waktu <= 0 && !currentData.persiapan) {
-                clearInterval(intervalId);
-                intervalTracker[index] = null;
-                currentData.selesai = true;
-                simpanData();
-                if (timerCell) {
-                    timerCell.innerHTML = `<span class="merah timer-badge">✔️ SELESAI</span>`;
-                }
-                tambahAntrianSuaraDuaKali(index, currentData.nama, currentData.wbp);
-                tampilkanNotifikasi(index, currentData);
-                tampilkanTabel();
-            }
-        }, 1000);
-        intervalTracker[index] = intervalId;
-    }
-
+    // ======================= FULLSCREEN =======================
     function toggleFullscreen() {
         const container = document.getElementById("mainContainer");
         container.classList.toggle("fullscreen");
@@ -615,24 +644,14 @@
         }
     }
 
+    // ======================= INISIALISASI =======================
     window.onload = function() {
-        tampilkanTabel();
-        for (let i = 0; i < daftarData.length; i++) {
-            const item = daftarData[i];
-            if (!item.selesai && item.persiapan && item.waktuPersiapan <= 0) {
-                item.persiapan = false;
-                item.waktu = waktuAwal * 60;
-                simpanData();
-            }
-            if (!item.selesai && !item.persiapan && item.waktu <= 0) {
-                item.selesai = true;
-                simpanData();
-                tambahAntrianSuaraDuaKali(i, item.nama, item.wbp);
-            }
-            if (!item.selesai) mulaiTimer(i);
-        }
+        loadDariFirebase();      // mendengarkan perubahan realtime
+        startGlobalTimer();      // mulai timer setiap detik untuk update UI dan status
 
-        const inputNama = document.getElementById("nama"), inputWbp = document.getElementById("wbp");
+        // Event Enter pada form
+        const inputNama = document.getElementById("nama");
+        const inputWbp = document.getElementById("wbp");
         function handleEnter(e) { if (e.key === 'Enter') { e.preventDefault(); tambahData(); } }
         inputNama.addEventListener("keypress", handleEnter);
         inputWbp.addEventListener("keypress", handleEnter);
@@ -640,4 +659,3 @@
 </script>
 </body>
 </html>
-```
