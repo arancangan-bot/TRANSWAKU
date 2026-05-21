@@ -1,411 +1,235 @@
+```html
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Jamkot | Dashboard Antrian - Lapas Cikarang</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', system-ui;
-            min-height: 100vh;
-            padding: 30px 20px;
-            background-image: url('background.png');
-            background-size: cover;
-            background-position: center;
-            background-color: #1e3c4a;
-        }
-        .main-container {
-            max-width: 1300px;
-            margin: 0 auto;
-            background: rgba(255,255,255,0.94);
-            border-radius: 2rem;
-            padding: 25px 30px 35px;
-            box-shadow: 0 25px 45px rgba(0,0,0,0.3);
-        }
-        .main-container.fullscreen {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            border-radius: 0;
-            overflow-y: auto;
-            z-index: 9999;
-        }
-        .header-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            border-bottom: 4px solid #facc15;
-        }
-        .logo-left, .logo-right { padding: 8px 16px; }
-        .judul-utama { text-align: center; flex: 1; }
-        .judul-utama h2 { text-shadow: 2px 2px 5px black; color: #FFE484; }
-        .logo-left img, .logo-right img { height: 90px; object-fit: contain; }
-        .toolbar-area {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 15px;
-            margin: 25px 0 20px;
-        }
-        button {
-            padding: 12px 28px;
-            border-radius: 40px;
-            font-weight: 600;
-            border: none;
-            background: #1e466e;
-            color: white;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        button:hover { transform: translateY(-2px); filter: brightness(1.05); }
-        .btn-input-page { background: #2a7f62; }
-        .btn-repeat-last { background: #2d5f3e; }
-        .btn-fullscreen { background: #6b21a5; }
-        .table-wrapper {
-            overflow-x: auto;
-            max-height: 520px;
-            border: 1px solid #ccc;
-            border-radius: 1rem;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-        th {
-            background: #1e3c4a;
-            color: white;
-            padding: 14px;
-            position: sticky;
-            top: 0;
-        }
-        td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .merah { background: #fee2e2; color: #dc2626; border-radius: 40px; padding: 4px 12px; display: inline-block; }
-        .hijau { background: #dcfce7; color: #0e7c32; border-radius: 40px; padding: 4px 12px; display: inline-block; }
-        .btn-hapus-satu { background: #b91c1c; padding: 6px 18px; border-radius: 30px; }
-        .hapus-semua-wrapper { text-align: center; margin-top: 20px; }
-        .auto-refresh-badge {
-            position: fixed;
-            bottom: 15px;
-            left: 15px;
-            background: rgba(0,0,0,0.7);
-            color: #facc15;
-            padding: 6px 14px;
-            border-radius: 30px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            z-index: 999;
-        }
-        @media (max-width: 700px) {
-            .logo-left img, .logo-right img { height: 60px; }
-            button { padding: 8px 16px; font-size: 0.8rem; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Input Antrian | Jamkot</title>
+
+<style>
+    *{
+        margin:0;
+        padding:0;
+        box-sizing:border-box;
+    }
+
+    body{
+        font-family:'Segoe UI',sans-serif;
+        min-height:100vh;
+        background:#1e3c4a;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        padding:20px;
+    }
+
+    .card{
+        width:100%;
+        max-width:500px;
+        background:white;
+        border-radius:25px;
+        padding:35px;
+        box-shadow:0 15px 35px rgba(0,0,0,0.3);
+    }
+
+    h1{
+        text-align:center;
+        margin-bottom:25px;
+        color:#1e3c4a;
+    }
+
+    .form-group{
+        margin-bottom:20px;
+    }
+
+    label{
+        display:block;
+        margin-bottom:8px;
+        font-weight:bold;
+        color:#334155;
+    }
+
+    input{
+        width:100%;
+        padding:14px;
+        border-radius:14px;
+        border:1px solid #cbd5e1;
+        font-size:1rem;
+    }
+
+    button{
+        width:100%;
+        padding:15px;
+        border:none;
+        border-radius:18px;
+        background:#0f766e;
+        color:white;
+        font-size:1rem;
+        font-weight:bold;
+        cursor:pointer;
+        transition:0.2s;
+    }
+
+    button:hover{
+        transform:translateY(-2px);
+    }
+
+    .notif{
+        margin-top:20px;
+        padding:14px;
+        border-radius:14px;
+        text-align:center;
+        display:none;
+        font-weight:bold;
+    }
+
+    .success{
+        background:#dcfce7;
+        color:#166534;
+    }
+
+    .toolbar{
+        margin-top:20px;
+        display:flex;
+        gap:10px;
+    }
+
+    .toolbar a{
+        flex:1;
+        text-align:center;
+        padding:12px;
+        border-radius:14px;
+        text-decoration:none;
+        background:#1e3c4a;
+        color:white;
+        font-weight:bold;
+    }
+</style>
 </head>
+
 <body>
-<div class="main-container" id="mainContainer">
-    <div class="header-wrapper">
-        <div class="logo-left"><img src="imipas.png" alt="Kemenimipas" onerror="this.style.display='none'"></div>
-        <div class="judul-utama">
-            <h2>LAPAS KELAS IIA CIKARANG</h2>
-            <h2>DASHBOARD ANTRIAN KUNJUNGAN</h2>
-            <h2>RANCANGAN AKTUALISASI RICKY MARTIN</h2>
-        </div>
-        <div class="logo-right"><img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display='none'"></div>
+
+<div class="card">
+
+    <h1>📝 Input Antrian</h1>
+
+    <div class="form-group">
+        <label>Nama Pengunjung</label>
+        <input type="text" id="nama" placeholder="Masukkan nama pengunjung">
     </div>
-    <div class="toolbar-area">
-        <button class="btn-input-page" onclick="window.location.href='input.html'">📝 Buka Halaman Input</button>
-        <button class="btn-repeat-last" onclick="ulangiPanggilanTerakhir()">🔁 Ulangi Panggilan Terakhir</button>
-        <button class="btn-fullscreen" onclick="toggleFullscreen()">🖥️ Full Layar</button>
+
+    <div class="form-group">
+        <label>Nama WBP</label>
+        <input type="text" id="wbp" placeholder="Masukkan nama WBP">
     </div>
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr><th>No</th><th>Nama Pengunjung</th><th>Nama WBP</th><th>Status / Waktu</th><th>Aksi</th></tr>
-            </thead>
-            <tbody id="tabelData"></tbody>
-        </table>
+
+    <button onclick="tambahAntrian()">
+        ➕ Tambah Antrian
+    </button>
+
+    <div id="notif" class="notif success"></div>
+
+    <div class="toolbar">
+        <a href="index.html">📺 Dashboard</a>
     </div>
-    <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
+
 </div>
-<div id="notifikasi" style="display:none;"></div>
-<div class="auto-refresh-badge" id="refreshIndicator">🔄 Sinkron realtime</div>
 
 <script type="module">
-    // ==================== KONFIGURASI FIREBASE ====================
-    const firebaseConfig = {
-        apiKey: "AIzaSyCAmnu2YFewAm07IJ1a2_lN4N3i-TL5hAM",
-        authDomain: "transwaku-e0fc6.firebaseapp.com",
-        databaseURL: "https://transwaku-e0fc6-default-rtdb.firebaseio.com",
-        projectId: "transwaku-e0fc6",
-        storageBucket: "transwaku-e0fc6.firebasestorage.app",
-        messagingSenderId: "797562598719",
-        appId: "1:797562598719:web:5143263044366af884cf8a",
-    };
 
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, update, remove, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    
-    // ** PERUBAHAN: PATH 'antrian' diganti menjadi 'kunjungan' **
-    const kunjunganRef = ref(db, 'kunjungan');
+import {
+    getDatabase,
+    ref,
+    get,
+    set
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // Variabel global
-    let daftarData = [];
-    let dataKeys = [];
-    let intervalTracker = [];
-    let antrianSuara = [];
-    let sedangSuara = false;
-    let panggilanTerakhir = null;
-    let suaraPerempuan = null;
-    const DURASI_MENIT = 1;
 
-    // ======================== FIREBASE REALTIME ========================
-    function bindFirebaseRealtime() {
-        onValue(kunjunganRef, (snapshot) => {
-            const newData = [];
-            const newKeys = [];
-            snapshot.forEach((childSnapshot) => {
-                newData.push(childSnapshot.val());
-                newKeys.push(childSnapshot.key);
-            });
-            newData.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
-            if (JSON.stringify(daftarData) !== JSON.stringify(newData)) {
-                daftarData = newData;
-                dataKeys = newKeys;
-                resetSemuaTimerDanSuara();
-                renderTabel();
-                mulaiSemuaTimer();
-                const badge = document.getElementById('refreshIndicator');
-                badge.style.background = '#facc15';
-                badge.style.color = '#1e3c4a';
-                setTimeout(() => {
-                    badge.style.background = 'rgba(0,0,0,0.7)';
-                    badge.style.color = '#facc15';
-                }, 800);
-            }
-        });
+// ================= FIREBASE =================
+const firebaseConfig = {
+    apiKey: "AIzaSyBfe6l1oz-oHEnIpExWf7L_c7WOVAQGz3U",
+    authDomain: "jamkot-73af5.firebaseapp.com",
+    databaseURL: "https://jamkot-73af5-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "jamkot-73af5",
+    storageBucket: "jamkot-73af5.firebasestorage.app",
+    messagingSenderId: "920727142933",
+    appId: "1:920727142933:web:2fe747a74d76873e61041c",
+    measurementId: "G-93MKKF2F2B"
+};
+
+const app = initializeApp(firebaseConfig);
+
+const db = getDatabase(app);
+
+const dataRef = ref(db, "antrian");
+
+
+// ================= TAMBAH ANTRIAN =================
+window.tambahAntrian = async function(){
+
+    const nama = document.getElementById("nama").value.trim();
+
+    const wbp = document.getElementById("wbp").value.trim();
+
+    if(!nama || !wbp){
+        alert("Semua field wajib diisi");
+        return;
     }
 
-    async function updateItemToFirebase(index, updatedFields) {
-        if (!dataKeys[index]) return;
-        // PERUBAHAN: path menggunakan 'kunjungan'
-        const itemRef = ref(db, `kunjungan/${dataKeys[index]}`);
-        await update(itemRef, updatedFields);
-    }
+    try{
 
-    // ======================== TIMER & STATUS ========================
-    function resetSemuaTimerDanSuara() {
-        intervalTracker.forEach(id => clearInterval(id));
-        intervalTracker = [];
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
-        antrianSuara = [];
-        sedangSuara = false;
-    }
+        const snapshot = await get(dataRef);
 
-    function mulaiTimer(index) {
-        if (intervalTracker[index]) clearInterval(intervalTracker[index]);
-        const item = daftarData[index];
-        if (!item || item.selesai) return;
+        let daftarData = [];
 
-        const intervalId = setInterval(async () => {
-            const cur = daftarData[index];
-            if (!cur || cur.selesai) {
-                clearInterval(intervalId);
-                intervalTracker[index] = null;
-                return;
-            }
-            const cell = document.getElementById(`timer-${index}`);
-            if (cur.persiapan) {
-                if (cur.waktuPersiapan > 0) {
-                    cur.waktuPersiapan--;
-                    if (cell) cell.innerHTML = `<span class="hijau">⏳ PERSIAPAN (${cur.waktuPersiapan}s)</span>`;
-                    await updateItemToFirebase(index, { waktuPersiapan: cur.waktuPersiapan });
-                } else {
-                    cur.persiapan = false;
-                    cur.waktu = DURASI_MENIT * 60;
-                    if (cell) cell.innerHTML = `<span>⏱️ ${Math.floor(cur.waktu/60)}:${(cur.waktu%60).toString().padStart(2,'0')}</span>`;
-                    await updateItemToFirebase(index, { persiapan: false, waktu: cur.waktu });
-                }
-                return;
-            }
-            if (cur.waktu > 0 && !cur.selesai) {
-                cur.waktu--;
-                const menit = Math.floor(cur.waktu/60);
-                const detik = cur.waktu%60;
-                if (cell) {
-                    let kelas = cur.waktu <= 10 ? "merah" : "";
-                    cell.innerHTML = `<span class="${kelas}" style="font-weight:bold;">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
-                }
-                await updateItemToFirebase(index, { waktu: cur.waktu });
-            } else if (!cur.selesai && cur.waktu <= 0 && !cur.persiapan) {
-                clearInterval(intervalId);
-                intervalTracker[index] = null;
-                cur.selesai = true;
-                if (cell) cell.innerHTML = `<span class="merah">✔️ SELESAI</span>`;
-                await updateItemToFirebase(index, { selesai: true });
-                panggilSuara(index, cur.nama, cur.wbp);
-                tampilkanNotifikasi(index, cur);
-                renderTabel();
-            }
-        }, 1000);
-        intervalTracker[index] = intervalId;
-    }
-
-    function mulaiSemuaTimer() {
-        daftarData.forEach((_, i) => {
-            if (!daftarData[i].selesai) mulaiTimer(i);
-        });
-    }
-
-    // ======================== SUARA ========================
-    async function getSuaraPerempuan() {
-        return new Promise((resolve) => {
-            if (suaraPerempuan) { resolve(suaraPerempuan); return; }
-            const cek = setInterval(() => {
-                const voices = window.speechSynthesis.getVoices();
-                if (voices.length) {
-                    clearInterval(cek);
-                    let pilih = voices.find(v => v.lang === 'id-ID' && v.name.toLowerCase().includes('female')) ||
-                                voices.find(v => v.lang === 'id-ID') ||
-                                voices[0];
-                    suaraPerempuan = pilih;
-                    resolve(pilih);
-                }
-            }, 100);
-        });
-    }
-
-    async function playSuara(nomor, nama, wbp) {
-        const teks = `Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Silakan bersiap meninggalkan ruangan kunjungan. Terima kasih.`;
-        return new Promise(async (resolve) => {
-            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
-            const speech = new SpeechSynthesisUtterance(teks);
-            speech.lang = "id-ID";
-            speech.rate = 0.92;
-            speech.pitch = 1.15;
-            const voice = await getSuaraPerempuan();
-            if (voice) speech.voice = voice;
-            speech.onend = resolve;
-            speech.onerror = resolve;
-            window.speechSynthesis.speak(speech);
-        });
-    }
-
-    async function panggilSuara(index, nama, wbp) {
-        const nomor = index + 1;
-        antrianSuara.push({ nomor, nama, wbp });
-        antrianSuara.push({ nomor, nama, wbp });
-        panggilanTerakhir = { nomorUrut: nomor, nama, wbp };
-        prosesAntrianSuara();
-    }
-
-    async function prosesAntrianSuara() {
-        if (sedangSuara || antrianSuara.length === 0) return;
-        sedangSuara = true;
-        const item = antrianSuara.shift();
-        await playSuara(item.nomor, item.nama, item.wbp);
-        await new Promise(r => setTimeout(r, 600));
-        sedangSuara = false;
-        prosesAntrianSuara();
-    }
-
-    window.ulangiPanggilanTerakhir = async function() {
-        if (!panggilanTerakhir) {
-            const lastSelesai = [...daftarData].reverse().find(i => i.selesai === true);
-            if (!lastSelesai) { alert("Belum ada antrian yang selesai."); return; }
-            const idx = daftarData.findIndex(i => i === lastSelesai);
-            panggilanTerakhir = { nomorUrut: idx+1, nama: lastSelesai.nama, wbp: lastSelesai.wbp };
+        if(snapshot.exists()){
+            daftarData = snapshot.val();
         }
-        await playSuara(panggilanTerakhir.nomorUrut, panggilanTerakhir.nama, panggilanTerakhir.wbp);
-        tampilNotif("🔊 Panggilan diulang", `No. ${panggilanTerakhir.nomorUrut} - ${panggilanTerakhir.nama} → ${panggilanTerakhir.wbp}`, "#2d5f3e");
-    };
 
-    function tampilkanNotifikasi(idx, data) {
-        const box = document.getElementById("notifikasi");
-        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:#dc2626; color:white; padding:16px; border-radius:24px; z-index:10000; border-left:6px solid #facc15;">
-            <strong>⏰ WAKTU KUNJUNGAN HABIS</strong><br>
-            No. ${idx+1} | ${data.nama} → ${data.wbp}<br>
-            🔔 Panggilan suara (2x)
-        </div>`;
-        box.style.display = "block";
-        setTimeout(() => box.style.display = "none", 8000);
-    }
-
-    function tampilNotif(judul, pesan, warna) {
-        const box = document.getElementById("notifikasi");
-        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000;"><strong>${judul}</strong><br>${pesan}</div>`;
-        box.style.display = "block";
-        setTimeout(() => box.style.display = "none", 4000);
-    }
-
-    // ======================== RENDER TABEL ========================
-    function escapeHtml(str) {
-        if (!str) return "";
-        return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
-    }
-
-    function renderTabel() {
-        const tbody = document.getElementById("tabelData");
-        tbody.innerHTML = "";
-        daftarData.forEach((item, i) => {
-            let statusHtml = "";
-            if (item.persiapan) {
-                statusHtml = `<span class="hijau" id="timer-${i}">⏳ PERSIAPAN (${item.waktuPersiapan}s)</span>`;
-            } else if (item.selesai) {
-                statusHtml = `<span class="merah" id="timer-${i}">✔️ SELESAI</span>`;
-            } else {
-                const menit = Math.floor(item.waktu / 60);
-                const detik = item.waktu % 60;
-                const kelas = item.waktu <= 10 ? "merah" : "";
-                statusHtml = `<span class="${kelas}" id="timer-${i}" style="font-weight:bold;">⏱️ ${menit}:${detik.toString().padStart(2,'0')}</span>`;
-            }
-            tbody.innerHTML += `
-                <tr>
-                    <td>${i+1}</td>
-                    <td>${escapeHtml(item.nama)}</td>
-                    <td>${escapeHtml(item.wbp)}</td>
-                    <td>${statusHtml}</td>
-                    <td><button class="btn-hapus-satu" onclick="hapusData(${i})">🗑 Hapus</button></td>
-                </tr>
-            `;
+        daftarData.push({
+            nama: nama,
+            wbp: wbp,
+            waktu: 60,
+            selesai: false,
+            persiapan: false,
+            waktuPersiapan: 10
         });
+
+        await set(dataRef, daftarData);
+
+        document.getElementById("nama").value = "";
+        document.getElementById("wbp").value = "";
+
+        tampilNotif("✅ Antrian berhasil ditambahkan");
+
+    }catch(err){
+
+        console.error(err);
+
+        alert("Gagal menambahkan data");
     }
+}
 
-    window.hapusData = async function(index) {
-        if (!dataKeys[index]) return;
-        if (confirm(`Hapus antrian untuk ${daftarData[index]?.nama}?`)) {
-            if (intervalTracker[index]) clearInterval(intervalTracker[index]);
-            // PERUBAHAN: path menggunakan 'kunjungan'
-            const itemRef = ref(db, `kunjungan/${dataKeys[index]}`);
-            await remove(itemRef);
-        }
-    };
 
-    window.hapusSemuaData = async function() {
-        if (confirm("Hapus SEMUA data antrian?")) {
-            resetSemuaTimerDanSuara();
-            // PERUBAHAN: gunakan kunjunganRef
-            await set(kunjunganRef, null);
-        }
-    };
+// ================= NOTIF =================
+function tampilNotif(teks){
 
-    window.toggleFullscreen = function() {
-        document.getElementById("mainContainer").classList.toggle("fullscreen");
-    };
+    const notif = document.getElementById("notif");
 
-    // ======================== INIT ========================
-    window.onload = async () => {
-        await getSuaraPerempuan();
-        bindFirebaseRealtime();
-    };
+    notif.innerHTML = teks;
+
+    notif.style.display = "block";
+
+    setTimeout(()=>{
+        notif.style.display = "none";
+    },3000);
+}
+
 </script>
+
 </body>
 </html>
+```
