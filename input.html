@@ -77,78 +77,24 @@
         <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display='none'">
     </div>
     <div class="judul"><h2>📋 TAMBAH ANTRIAN</h2><p>Lapas Kelas IIA Cikarang</p></div>
-    <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="Nama lengkap pengunjung"></div>
-    <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="Nama WBP" autocomplete="off"></div>
+    <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder></div>
+    <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder=autocomplete="off"></div>
     <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
     <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
 </div>
 <div id="notifTemp"></div>
-
-<!-- FIREBASE MODULE -->
-<script type="module">
-    // ==================== KONFIGURASI FIREBASE (GANTI DENGAN PUNYA ANDA) ====================
-    const firebaseConfig = {
-    const firebaseConfig = {
-    apiKey: "AIzaSyCAmnu2YFewAm07IJ1a2_lN4N3i-TL5hAM",
-    authDomain: "transwaku-e0fc6.firebaseapp.com",
-    databaseURL: "https://transwaku-e0fc6-default-rtdb.firebaseio.com",
-    projectId: "transwaku-e0fc6",
-    storageBucket: "transwaku-e0fc6.firebasestorage.app",
-    messagingSenderId: "797562598719",
-    appId: "1:797562598719:web:5143263044366af884cf8a",
-};
-    };
-
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const antrianRef = ref(db, 'antrian');
-
-    // Update jumlah antrian di info box
-    function updateJumlahAntrian() {
-        get(antrianRef).then((snapshot) => {
-            let count = 0;
-            snapshot.forEach(() => count++);
-            document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${count} orang`;
-        }).catch(() => {
-            document.getElementById("infoAntrian").innerHTML = "⚠️ Gagal memuat data";
-        });
+<script>
+    let dataAntrian = [];
+    function loadData() {
+        const stored = localStorage.getItem("dataKunjungan");
+        dataAntrian = stored ? JSON.parse(stored) : [];
+        document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${dataAntrian.length} orang`;
     }
-
-    window.tambahAntrianBaru = async function() {
-        let nama = document.getElementById("namaPengunjung").value.trim();
-        let wbp = document.getElementById("namaWbp").value.trim();
-        if(!nama || !wbp) {
-            tampilNotif("⚠️ Kedua field harus diisi!", true);
-            return;
-        }
-        const newData = {
-            nama: nama,
-            wbp: wbp,
-            waktu: 0,
-            selesai: false,
-            persiapan: true,
-            waktuPersiapan: 10,
-            timestamp: Date.now()
-        };
-        try {
-            await push(antrianRef, newData);
-            tampilNotif(`✅ Antrian ditambahkan! ${nama} → ${wbp}`);
-            document.getElementById("namaPengunjung").value = "";
-            document.getElementById("namaWbp").value = "";
-            document.getElementById("namaPengunjung").focus();
-            updateJumlahAntrian();
-        } catch(e) {
-            tampilNotif("❌ Gagal simpan ke server", true);
-        }
-    };
-
-    window.kembaliKeDashboard = function() {
-        window.location.href = './Jamkot0.html';
-    };
-
+    function simpanDanRefresh() {
+        localStorage.setItem("dataKunjungan", JSON.stringify(dataAntrian));
+        loadData();
+        window.dispatchEvent(new StorageEvent('storage', { key: 'dataKunjungan', newValue: JSON.stringify(dataAntrian) }));
+    }
     function tampilNotif(pesan, isError=false) {
         let div = document.createElement("div");
         div.className = "notif-sukses";
@@ -159,11 +105,25 @@
         container.appendChild(div);
         setTimeout(() => div.remove(), 3000);
     }
-
-    // Load awal
-    updateJumlahAntrian();
-    // Update setiap 3 detik
-    setInterval(updateJumlahAntrian, 3000);
+    function tambahAntrianBaru() {
+        let nama = document.getElementById("namaPengunjung").value.trim();
+        let wbp = document.getElementById("namaWbp").value.trim();
+        if(!nama || !wbp) { tampilNotif("⚠️ Kedua field harus diisi!", true); return; }
+        // TIDAK ADA BATASAN MAKSIMAL (unlimited)
+        dataAntrian.push({ nama, wbp, waktu: 0, selesai: false, persiapan: true, waktuPersiapan: 10 });
+        simpanDanRefresh();
+        tampilNotif(`✅ Antrian ditambahkan! No. ${dataAntrian.length} - ${nama} → ${wbp}`);
+        document.getElementById("namaPengunjung").value = "";
+        document.getElementById("namaWbp").value = "";
+        document.getElementById("namaPengunjung").focus();
+    }
+    function kembaliKeDashboard() {
+        // Mengarah ke file index.html di folder yang sama
+        window.location.href = './Jamkot0.html';
+    }
+    loadData();
+    setInterval(loadData, 3000);
+    window.addEventListener('storage', (e) => { if(e.key === 'dataKunjungan') loadData(); });
 </script>
 </body>
 </html>
