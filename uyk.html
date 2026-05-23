@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>Jamkot | Input Antrian - Lapas Cikarang</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", "Poppins", system-ui;
+        min-height: 100vh;
+        padding: 30px 20px;
+        background-image: url("background.png");
+        background-size: cover;
+        background-position: center;
+        background-color: #0f2c38;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .card-input {
+        max-width: 550px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.96);
+        border-radius: 2rem;
+        padding: 2rem;
+        box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
+      }
+      .logo-area {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .logo-area img {
+        height: 70px;
+        margin: 0 5px;
+      }
+      .judul {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .judul h2 {
+        color: #1e3c4a;
+        border-left: 6px solid #facc15;
+        display: inline-block;
+        padding: 0 20px;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      .form-group label {
+        font-weight: 700;
+        display: block;
+        margin-bottom: 8px;
+        color: #0f2c38;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 14px 18px;
+        border: 2px solid #e2e8f0;
+        border-radius: 60px;
+        font-size: 1rem;
+      }
+      .form-group input:focus {
+        border-color: #2a7f62;
+        outline: none;
+      }
+      .btn-group {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+      }
+      button {
+        flex: 1;
+        padding: 12px;
+        border-radius: 60px;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .btn-simpan {
+        background: #2a7f62;
+        color: white;
+      }
+      .btn-back {
+        background: #475569;
+        color: white;
+      }
+      button:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.05);
+      }
+      .info-antrian {
+        background: #f1f5f9;
+        border-radius: 2rem;
+        padding: 12px;
+        text-align: center;
+        margin-top: 20px;
+        font-weight: 600;
+      }
+      .notif-sukses {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: #0e7c32;
+        color: white;
+        padding: 14px;
+        border-radius: 60px;
+        text-align: center;
+        z-index: 1000;
+        max-width: 400px;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card-input">
+      <div class="logo-area">
+        <img src="imipas.png" alt="Kemenimipas" onerror="this.style.display = 'none'" />
+        <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display = 'none'" />
+      </div>
+      <div class="judul">
+        <h2>📋 TAMBAH ANTRIAN</h2>
+        <p>Lapas Kelas IIA Cikarang</p>
+      </div>
+      <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder /></div>
+      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="autocomplete" ="off" /></div>
+      <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
+      <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
+    </div>
+    <div id="notifTemp"></div>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+
+      import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+      // ======================
+      // FIREBASE CONFIG
+      // ======================
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
+
+        authDomain: "ruang-kunjungan.firebaseapp.com",
+
+        projectId: "ruang-kunjungan",
+
+        storageBucket: "ruang-kunjungan.firebasestorage.app",
+
+        messagingSenderId: "1070275298561",
+
+        appId: "1:1070275298561:web:c74c42680e7fded17e8700",
+      };
+
+      // ======================
+      // INIT FIREBASE
+      // ======================
+
+      const app = initializeApp(firebaseConfig);
+
+      const db = getFirestore(app);
+
+      // ======================
+      // LOAD JUMLAH ANTRIAN
+      // ======================
+
+      async function loadData() {
+        try {
+          const snapshot = await getDocs(collection(db, "antrian"));
+
+          document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${snapshot.size} orang`;
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      // ======================
+      // NOTIFIKASI
+      // ======================
+
+      function tampilNotif(pesan, isError = false) {
+        let div = document.createElement("div");
+
+        div.className = "notif-sukses";
+
+        div.style.background = isError ? "#b91c1c" : "#0e7c32";
+
+        div.innerText = pesan;
+
+        let container = document.getElementById("notifTemp");
+
+        container.innerHTML = "";
+
+        container.appendChild(div);
+
+        setTimeout(() => {
+          div.remove();
+        }, 3000);
+      }
+
+      // ======================
+      // TAMBAH ANTRIAN
+      // ======================
+
+      window.tambahAntrianBaru = async function () {
+        let nama = document.getElementById("namaPengunjung").value.trim();
+
+        let wbp = document.getElementById("namaWbp").value.trim();
+
+        // VALIDASI
+
+        if (!nama || !wbp) {
+          tampilNotif("⚠️ Nama Pengunjung dan Nama WBP wajib diisi!", true);
+
+          return;
+        }
+
+        try {
+          // SIMPAN KE FIREBASE
+
+          await addDoc(
+            collection(db, "antrian"),
+
+            {
+              nama: nama,
+
+              wbp: wbp,
+
+              status: "persiapan",
+
+              createdAt: serverTimestamp(),
+
+              durasiPersiapan: 10,
+
+              durasiKunjungan: 60,
+            },
+          );
+
+          tampilNotif(`✅ Antrian berhasil ditambahkan`);
+
+          // RESET INPUT
+
+          document.getElementById("namaPengunjung").value = "";
+
+          document.getElementById("namaWbp").value = "";
+
+          document.getElementById("namaPengunjung").focus();
+
+          // REFRESH COUNTER
+
+          loadData();
+        } catch (error) {
+          console.error(error);
+
+          tampilNotif("❌ Gagal menyimpan data ke Firebase", true);
+        }
+      };
+
+      // ======================
+      // KEMBALI DASHBOARD
+      // ======================
+
+      window.kembaliKeDashboard = function () {
+        window.location.href = "./kuy.html";
+      };
+
+      // ======================
+      // INIT
+      // ======================
+
+      loadData();
+
+      setInterval(loadData, 5000);
+    </script>
+  </body>
+</html>
