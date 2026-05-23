@@ -306,7 +306,7 @@
       }
 
       async function playSuara(nomor, nama, wbp) {
-        const teks = `Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
+        const teks = `Mohon Perhatian. Nomor antrian ${nomor},Pengunjung Atas Nama ${nama} Kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
         speech.rate = 0.92;
