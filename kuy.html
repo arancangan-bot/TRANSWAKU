@@ -343,7 +343,7 @@
         const created = item.createdAt.toDate().getTime();
         const sekarang = Date.now();
         const elapsed = Math.floor((sekarang - created) / 1000);
-        // Durasi persiapan default 5 menit (300 detik)
+        // Durasi persiapan default (10 detik)
         const persiapan = (item.durasiPersiapan && !isNaN(item.durasiPersiapan)) ? item.durasiPersiapan : 300;
         // Durasi kunjungan default 20 MENIT = 1200 DETIK
         const kunjungan = (item.durasiKunjungan && !isNaN(item.durasiKunjungan)) ? item.durasiKunjungan : 1200;
