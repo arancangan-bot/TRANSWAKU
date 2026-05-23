@@ -91,6 +91,15 @@
       .btn-fullscreen {
         background: #6b21a5;
       }
+      .btn-enable-sound {
+        background: #dc2626;
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0% { opacity: 0.7; }
+        50% { opacity: 1; }
+        100% { opacity: 0.7; }
+      }
       .table-wrapper {
         overflow-x: auto;
         max-height: 520px;
@@ -158,26 +167,6 @@
           font-size: 0.8rem;
         }
       }
-      .group-header {
-        background-color: #f1f5f9;
-        font-weight: bold;
-        text-align: center;
-        font-size: 0.9rem;
-      }
-      .group-header td {
-        background-color: #e2e8f0;
-        padding: 8px;
-      }
-      .info-durasi {
-        background: #facc15;
-        color: #1e3c4a;
-        padding: 5px 12px;
-        border-radius: 40px;
-        font-size: 0.7rem;
-        font-weight: bold;
-        display: inline-block;
-        margin-left: 10px;
-      }
     </style>
   </head>
   <body>
@@ -195,12 +184,13 @@
         <button class="btn-input-page" onclick="window.location.href = 'uyk.html'">📝 Buka Halaman Input</button>
         <button class="btn-repeat-last" onclick="ulangiPanggilanTerakhir()">🔁 Ulangi Panggilan Terakhir</button>
         <button class="btn-fullscreen" onclick="toggleFullscreen()">🖥️ Full Layar</button>
+        <button class="btn-enable-sound" id="enableSoundBtn" onclick="enableAudio()">🔊 Aktifkan Suara Peringatan</button>
       </div>
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>No. Antrian</th>
+              <th>No</th>
               <th>Nama Pengunjung</th>
               <th>Nama WBP</th>
               <th>Status / Waktu</th>
@@ -212,6 +202,11 @@
       </div>
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
+    <div id="notifikasi" style="display: none"></div>
+    <div class="auto-refresh-badge" id="refreshIndicator"></div>
+
+    <!-- Audio Element untuk Backsound -->
+    <audio id="backsoundAudio" src="backsound.mpeg" preload="auto"></audio>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -229,31 +224,24 @@
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
+      // ======================
+      // INIT FIREBASE
+      // ======================
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
       // ======================
-      // GLOBAL STATE
+      // GLOBAL
       // ======================
       let daftarData = [];
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      let suaraDipanggil = new Map();
-      let antrianPanggilan = [];
-      let sedangMemprosesAntrian = false;
-      let backsoundAudio = null;
+      let suaraDipanggil = {};
+      let audioTriggered = {}; // Untuk backsound
+      let audioEnabled = false; // Flag izin audio
 
       // ======================
-      // INISIALISASI BACKSOUND
-      // ======================
-      function initBacksound() {
-        backsoundAudio = new Audio("backsound.mpeg");
-        backsoundAudio.preload = "auto";
-        backsoundAudio.onerror = () => console.warn("File backsound.mpeg tidak ditemukan.");
-      }
-
-      // ======================
-      // SUARA TTS
+      // AUDIO & SUARA
       // ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
@@ -272,270 +260,208 @@
         });
       }
 
-      async function speakTeks(teks) {
+      async function playSuara(nomor, nama, wbp) {
+        const teks = `Nomor antrian ${nomor},
+    ${nama} untuk ${wbp},
+    waktu kunjungan telah habis.
+    Silakan meninggalkan ruangan kunjungan.
+    Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
         speech.rate = 0.92;
         speech.pitch = 1.1;
         speech.voice = await getSuaraPerempuan();
-        return new Promise((resolve) => {
-          speech.onend = () => resolve();
-          speech.onerror = () => resolve();
-          speechSynthesis.speak(speech);
+        speechSynthesis.speak(speech);
+      }
+
+      function playBacksound() {
+        if (!audioEnabled) return;
+        const audio = document.getElementById("backsoundAudio");
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log("Audio play error:", e));
+      }
+
+      window.enableAudio = function() {
+        audioEnabled = true;
+        // Coba putar dan langsung pause untuk "mengaktifkan" audio context di beberapa browser
+        const audio = document.getElementById("backsoundAudio");
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          alert("✅ Suara peringatan telah diaktifkan!");
+          document.getElementById("enableSoundBtn").style.display = "none";
+        }).catch(e => {
+          console.log("Enable audio failed, but user can still click to trigger later.", e);
+          alert("⚠️ Klik OK, lalu sistem akan mencoba memutar suara saat dibutuhkan.");
         });
-      }
-
-      async function playSatuSiklus(nomor, nama, wbp) {
-        const teks = `Mohon Perhatian. Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
-        if (backsoundAudio) {
-          backsoundAudio.currentTime = 0;
-          await backsoundAudio.play().catch(e => console.warn("Backsound gagal:", e));
-        }
-        await speakTeks(teks);
-      }
-
-      async function playSuaraDenganUlang(nomor, nama, wbp) {
-        await playSatuSiklus(nomor, nama, wbp);
-        await playSatuSiklus(nomor, nama, wbp);
-      }
+      };
 
       // ======================
-      // PROSES ANTRIAN PANGGILAN
-      // ======================
-      async function prosesAntrianPanggilan() {
-        if (sedangMemprosesAntrian) return;
-        if (antrianPanggilan.length === 0) return;
-        sedangMemprosesAntrian = true;
-        while (antrianPanggilan.length > 0) {
-          const item = antrianPanggilan.shift();
-          panggilanTerakhir = {
-            nomor: item.nomor,
-            nama: item.nama,
-            wbp: item.wbp
-          };
-          tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp} (No. ${item.nomor})`, "#dc2626");
-          await playSuaraDenganUlang(item.nomor, item.nama, item.wbp);
-          await new Promise(r => setTimeout(r, 600));
-        }
-        sedangMemprosesAntrian = false;
-      }
-
-      function tambahKeAntrianPanggilan(id, nomor, nama, wbp) {
-        if (antrianPanggilan.some(item => item.id === id)) return;
-        antrianPanggilan.push({ id, nomor, nama, wbp });
-        antrianPanggilan.sort((a, b) => a.nomor - b.nomor);
-        prosesAntrianPanggilan();
-      }
-
-      // ======================
-      // STATUS TIMER (persiapan 10 detik hijau, lalu mundur 20 menit)
+      // STATUS TIMER
       // ======================
       function hitungStatus(item) {
         if (!item.createdAt) {
-          return { text: "⏳ Memuat...", class: "hijau", selesai: false };
+          return { text: "⏳ Memuat...", class: "hijau", sisaWaktu: Infinity, selesai: false };
         }
         const created = item.createdAt.toDate().getTime();
         const sekarang = Date.now();
         const elapsed = Math.floor((sekarang - created) / 1000);
-        // Durasi persiapan (default 10 detik)
-        const persiapan = (item.durasiPersiapan && !isNaN(item.durasiPersiapan)) ? item.durasiPersiapan : 10;
-        // Durasi kunjungan (default 20 menit = 1200 detik)
-        const kunjungan = (item.durasiKunjungan && !isNaN(item.durasiKunjungan)) ? item.durasiKunjungan : 1200;
+        const persiapan = item.durasiPersiapan; // 10 detik
+        const kunjungan = item.durasiKunjungan; // 1200 detik
 
+        // PERSIAPAN
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-          // Tampilkan sisa detik secara dinamis, warna hijau
-          return { text: `⏳ PERSIAPAN (${sisa} detik)`, class: "putih", selesai: false };
+          return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau", sisaWaktu: sisa, selesai: false };
         }
+
+        // BERJALAN
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = sisa % 60;
-          const teks = `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`;
-          // warna merah jika sisa <= 10 detik, hijau jika lebih
-          const kelas = sisa <= 10 ? "merah" : "hijau";
-          return { text: teks, class: kelas, selesai: false };
+          return { 
+            text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`, 
+            class: sisa <= 10 ? "merah" : "",
+            sisaWaktu: sisa,
+            selesai: false
+          };
         }
-        return { text: "✔️ SELESAI", class: "merah", selesai: true };
+
+        // SELESAI
+        return { text: "✔️ SELESAI", class: "merah", sisaWaktu: 0, selesai: true };
       }
 
       // ======================
-      // RENDER TABEL
+      // RENDER TABEL (DENGAN PENGURUTAN: AKTIF DI ATAS, SELESAI DI BAWAH)
       // ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
-        if (!tbody) return;
-
-        const sortedAll = [...daftarData].sort((a, b) => {
-          if (!a.createdAt) return 1;
-          if (!b.createdAt) return -1;
-          return a.createdAt.toDate().getTime() - b.createdAt.toDate().getTime();
-        });
-
-        const dataWithFixedNumber = sortedAll.map((item, idx) => ({
-          ...item,
-          nomorTetap: idx + 1
-        }));
-
-        const belumSelesai = [];
-        const sudahSelesai = [];
-
-        for (const item of dataWithFixedNumber) {
+        tbody.innerHTML = "";
+        
+        // Pisahkan data aktif dan selesai
+        const antrianAktif = [];
+        const antrianSelesai = [];
+        
+        daftarData.forEach(item => {
           const status = hitungStatus(item);
           if (status.selesai) {
-            sudahSelesai.push({ ...item, statusObj: status });
+            antrianSelesai.push({ item, status });
           } else {
-            belumSelesai.push({ ...item, statusObj: status });
+            antrianAktif.push({ item, status });
           }
-        }
-
-        belumSelesai.sort((a, b) => a.nomorTetap - b.nomorTetap);
-        sudahSelesai.sort((a, b) => a.nomorTetap - b.nomorTetap);
-
-        tbody.innerHTML = "";
-
-        function renderBaris(item, status) {
-          const sudahDipanggil = suaraDipanggil.get(item.id) === true;
-          if (status.selesai && !sudahDipanggil) {
-            suaraDipanggil.set(item.id, true);
-            tambahKeAntrianPanggilan(item.id, item.nomorTetap, item.nama, item.wbp);
+        });
+        
+        // Gabungkan: Aktif dulu, baru Selesai
+        const semuaTerurut = [...antrianAktif, ...antrianSelesai];
+        
+        // Loop untuk render
+        semuaTerurut.forEach((entry, index) => {
+          const { item, status } = entry;
+          const nomorUrut = index + 1;
+          
+          // TRIGGER SUARA WAKTU HABIS (SELESAI)
+          if (status.selesai && !suaraDipanggil[item.id]) {
+            suaraDipanggil[item.id] = true;
+            panggilanTerakhir = { nomor: nomorUrut, nama: item.nama, wbp: item.wbp };
+            playSuara(nomorUrut, item.nama, item.wbp);
+            tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
-          const namaAman = escapeHtml(item.nama);
-          const wbpAman = escapeHtml(item.wbp);
-          return `
+          
+          // TRIGGER BACKSOUND (5 DETIK SEBELUM HABIS)
+          if (!status.selesai && status.sisaWaktu <= 5 && status.sisaWaktu > 0 && !audioTriggered[item.id]) {
+            audioTriggered[item.id] = true;
+            playBacksound();
+            tampilNotif("🔊 Peringatan", `Waktu kunjungan ${item.nama} akan habis dalam ${status.sisaWaktu} detik`, "#f59e0b");
+          }
+          
+          tbody.innerHTML += `
             <tr>
-              <td><strong>${item.nomorTetap}</strong></td>
-              <td>${namaAman}</td>
-              <td>${wbpAman}</td>
+              <td>${nomorUrut}</td>
+              <td>${escapeHtml(item.nama)}</td>
+              <td>${escapeHtml(item.wbp)}</td>
               <td><span class="${status.class}">${status.text}</span></td>
               <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
             </tr>
           `;
-        }
-
-        if (belumSelesai.length > 0) {
-          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN  </td></tr>`;
-          for (const item of belumSelesai) {
-            tbody.innerHTML += renderBaris(item, item.statusObj);
-          }
-        }
-
-        if (sudahSelesai.length > 0) {
-          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🔴 ANTRIAN SELESAI (WAKTU HABIS)</td></tr>`;
-          for (const item of sudahSelesai) {
-            tbody.innerHTML += renderBaris(item, item.statusObj);
-          }
-        }
-        }
+        });
       }
 
       // ======================
-      // RESET STATE
+      // ESCAPE HTML
       // ======================
-      async function resetSemuaState() {
-        antrianPanggilan = [];
-        sedangMemprosesAntrian = false;
-        speechSynthesis.cancel();
-        if (backsoundAudio) {
-          backsoundAudio.pause();
-          backsoundAudio.currentTime = 0;
-        }
-        panggilanTerakhir = null;
-      }
-
-      // ======================
-      // FUNGSI GLOBAL
-      // ======================
-      window.hapusData = async function (id) {
-        if (!confirm("Hapus antrian ini?")) return;
-        await deleteDoc(doc(db, "antrian", id));
-        suaraDipanggil.delete(id);
-        antrianPanggilan = antrianPanggilan.filter(item => item.id !== id);
-        tampilNotif("✅ Terhapus", "Antrian dihapus", "#2a7f62");
-      };
-
-      window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian? Tindakan tidak bisa dibatalkan.")) return;
-        await resetSemuaState();
-        const snapshot = await getDocs(collection(db, "antrian"));
-        const promises = [];
-        snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
-        await Promise.all(promises);
-        suaraDipanggil.clear();
-        tampilNotif("🗑️ Semua Data Dihapus", "Dashboard telah dibersihkan", "#b91c1c");
-      };
-
-      window.ulangiPanggilanTerakhir = async function () {
-        if (!panggilanTerakhir) {
-          tampilNotif("Info", "Belum ada panggilan selesai yang tercatat", "#1e466e");
-          return;
-        }
-        await playSuaraDenganUlang(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
-        tampilNotif("🔁 Ulang Panggilan", `No. ${panggilanTerakhir.nomor} - ${panggilanTerakhir.nama}`, "#2d5f3e");
-      };
-
-      window.toggleFullscreen = function () {
-        document.getElementById("mainContainer").classList.toggle("fullscreen");
-      };
-
       function escapeHtml(str) {
         if (!str) return "";
         return str.replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
       }
 
+      // ======================
+      // NOTIF
+      // ======================
       function tampilNotif(judul, pesan, warna) {
         const box = document.getElementById("notifikasi");
-        box.innerHTML = `
-          <div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
-            <strong>${judul}</strong><br>${pesan}
-          </div>
-        `;
+        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000;"><strong>${judul}</strong><br>${pesan}</div>`;
         box.style.display = "block";
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
       // ======================
+      // HAPUS SATU
+      // ======================
+      window.hapusData = async function (id) {
+        if (!confirm("Hapus antrian ini?")) return;
+        await deleteDoc(doc(db, "antrian", id));
+      };
+
+      // ======================
+      // HAPUS SEMUA
+      // ======================
+      window.hapusSemuaData = async function () {
+        if (!confirm("Hapus semua antrian?")) return;
+        const snapshot = await getDocs(collection(db, "antrian"));
+        const promises = [];
+        snapshot.forEach((d) => { promises.push(deleteDoc(doc(db, "antrian", d.id))); });
+        await Promise.all(promises);
+      };
+
+      // ======================
+      // ULANGI SUARA
+      // ======================
+      window.ulangiPanggilanTerakhir = async function () {
+        if (!panggilanTerakhir) { alert("Belum ada panggilan."); return; }
+        await playSuara(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+      };
+
+      // ======================
+      // FULLSCREEN
+      // ======================
+      window.toggleFullscreen = function () {
+        document.getElementById("mainContainer").classList.toggle("fullscreen");
+      };
+
+      // ======================
       // REALTIME LISTENER
       // ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
-        const newData = [];
-        snapshot.forEach((docSnap) => {
-          newData.push({ id: docSnap.id, ...docSnap.data() });
+        daftarData = [];
+        snapshot.forEach((doc) => {
+          daftarData.push({ id: doc.id, ...doc.data() });
         });
-        daftarData = newData;
-
-        const idsExist = new Set(daftarData.map(d => d.id));
-        for (let id of suaraDipanggil.keys()) {
-          if (!idsExist.has(id)) suaraDipanggil.delete(id);
-        }
-        antrianPanggilan = antrianPanggilan.filter(item => idsExist.has(item.id));
-
         renderTabel();
       });
 
-      setInterval(() => {
-        renderTabel();
-      }, 1000);
+      // ======================
+      // AUTO TIMER RENDER
+      // ======================
+      setInterval(() => { renderTabel(); }, 1000);
 
+      // ======================
+      // INIT
+      // ======================
       window.onload = async function () {
-        initBacksound();
         await getSuaraPerempuan();
-        tampilNotif("🕒 Durasi", "Persiapan 10 detik (hijau) → Kunjungan 20 menit", "#d97706");
       };
-
-      function enableAudioContext() {
-        if (backsoundAudio) {
-          backsoundAudio.play().then(() => {
-            backsoundAudio.pause();
-            backsoundAudio.currentTime = 0;
-          }).catch(e => console.log("Audio context ready"));
-        }
-        document.removeEventListener("click", enableAudioContext);
-        document.removeEventListener("touchstart", enableAudioContext);
-      }
-      document.addEventListener("click", enableAudioContext);
-      document.addEventListener("touchstart", enableAudioContext);
     </script>
   </body>
 </html>
