@@ -138,7 +138,6 @@
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
       import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-      // ====================== FIREBASE CONFIG ======================
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
         authDomain: "ruang-kunjungan.firebaseapp.com",
@@ -148,11 +147,9 @@
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
-      // ====================== INIT FIREBASE ======================
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
-      // ====================== LOAD JUMLAH ANTRIAN ======================
       async function loadData() {
         try {
           const snapshot = await getDocs(collection(db, "antrian"));
@@ -173,7 +170,6 @@
         setTimeout(() => { div.remove(); }, 3000);
       }
 
-      // ====================== TAMBAH ANTRIAN (DURASI KUNJUNGAN 5 MENIT = 300 DETIK) ======================
       window.tambahAntrianBaru = async function () {
         let nama = document.getElementById("namaPengunjung").value.trim();
         let wbp = document.getElementById("namaWbp").value.trim();
@@ -184,20 +180,20 @@
         }
 
         try {
-          // DURASI KUNJUNGAN DI SET 5 MENIT = 300 DETIK
           await addDoc(collection(db, "antrian"), {
             nama: nama,
             wbp: wbp,
             status: "persiapan",
             createdAt: serverTimestamp(),
-            durasiKunjungan: 300,       // 5 MENIT (300 detik) sesuai permintaan
+            durasiPersiapan: 10,        // 10 detik persiapan
+            durasiKunjungan: 300,       // 5 menit = 300 detik
           });
 
           tampilNotif(`✅ Antrian berhasil ditambahkan (durasi kunjungan 5 menit)`);
           document.getElementById("namaPengunjung").value = "";
           document.getElementById("namaWbp").value = "";
           document.getElementById("namaPengunjung").focus();
-          loadData(); // refresh jumlah antrian
+          loadData();
         } catch (error) {
           console.error(error);
           tampilNotif("❌ Gagal menyimpan data ke Firebase", true);
@@ -208,7 +204,6 @@
         window.location.href = "./Jamkot0.html";
       };
 
-      // ====================== INIT & AUTO UPDATE JUMLAH ======================
       loadData();
       setInterval(loadData, 5000);
     </script>
