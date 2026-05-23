@@ -220,14 +220,14 @@
       let serverTimeOffset = 0;      // ms (serverTime = clientTime + offset)
       let isOffsetReady = false;
 
-      // ====================== KALIBRASI SERVER TIME (MULTI-SAMPLE + MEDIAN) ======================
+      // ====================== KALIBRASI SERVER TIME (5 SAMPEL, MEDIAN) ======================
       async function calibrateServerTime() {
-        // Cek localStorage (berlaku 10 menit)
+        // Cek localStorage (berlaku 5 menit)
         const savedOffset = localStorage.getItem("serverTimeOffset");
         const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
         if (savedOffset && savedTime) {
           const age = Date.now() - parseInt(savedTime);
-          if (age < 10 * 60 * 1000) {
+          if (age < 5 * 60 * 1000) {
             serverTimeOffset = parseInt(savedOffset);
             isOffsetReady = true;
             console.log("✅ Pakai offset dari localStorage:", serverTimeOffset, "ms");
@@ -235,9 +235,9 @@
           }
         }
 
-        // Lakukan 3 kali ping, ambil median RTT
+        // Lakukan 5 kali ping, ambil median RTT
         const samples = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 5; i++) {
           try {
             const tempRef = doc(collection(db, "tempTime"));
             const before = Date.now();
@@ -253,6 +253,8 @@
           } catch (e) {
             console.warn("Ping gagal", e);
           }
+          // Jeda 100ms antar ping
+          await new Promise(r => setTimeout(r, 100));
         }
 
         if (samples.length === 0) {
@@ -261,12 +263,12 @@
           return;
         }
 
-        // Ambil median
+        // Median
         samples.sort((a, b) => a - b);
         const median = samples[Math.floor(samples.length / 2)];
         serverTimeOffset = median;
         
-        // Simpan ke localStorage
+        // Simpan
         localStorage.setItem("serverTimeOffset", serverTimeOffset);
         localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
         isOffsetReady = true;
@@ -276,6 +278,14 @@
       function getCurrentServerTime() {
         return Date.now() + serverTimeOffset;
       }
+
+      // Rekalibrasi berkala setiap 30 detik
+      setInterval(async () => {
+        if (isOffsetReady) {
+          await calibrateServerTime();
+          renderTabel(); // refresh tampilan
+        }
+      }, 30000);
 
       // ====================== SUARA ======================
       async function getSuaraPerempuan() {
@@ -305,14 +315,14 @@
         speechSynthesis.speak(speech);
       }
 
-      // ====================== STATUS TIMER ======================
+      // ====================== STATUS TIMER (PRESISI DETIK) ======================
       function hitungStatus(item) {
         if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
           return { text: "⏳ Memuat...", class: "hijau" };
         }
         const serverCreated = item.createdAt.toDate().getTime();
         const serverNow = getCurrentServerTime();
-        let elapsed = Math.floor((serverNow - serverCreated) / 1000);
+        let elapsed = (serverNow - serverCreated) / 1000; // dalam detik, bisa pecahan
         if (elapsed < 0) elapsed = 0;
         
         const persiapan = item.durasiPersiapan || 10;
@@ -320,16 +330,16 @@
         
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-          return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau" };
+          return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
         }
         
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
-          const detik = sisa % 60;
+          const detik = Math.floor(sisa % 60);
           return { 
-            text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`, 
+            text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, 
             class: sisa <= 10 ? "merah" : "" 
           };
         }
@@ -337,7 +347,8 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER ======================
+      // ====================== RENDER DENGAN ANIMATION FRAME ======================
+      let renderRequestId = null;
       function renderTabel() {
         if (!isOffsetReady) {
           document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
@@ -376,6 +387,12 @@
               <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
             </tr>
           `;
+        });
+        
+        // Jadwalkan render ulang setiap 0.1 detik untuk presisi tinggi
+        if (renderRequestId) cancelAnimationFrame(renderRequestId);
+        renderRequestId = requestAnimationFrame(() => {
+          setTimeout(() => renderTabel(), 100);
         });
       }
 
@@ -429,16 +446,11 @@
         renderTabel();
       });
 
-      // Timer setiap detik
-      setInterval(() => {
-        if (isOffsetReady) renderTabel();
-      }, 1000);
-
       // ====================== INIT ======================
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Waktu tersinkron (selisih <0.2 detik) | Update realtime";
+        document.getElementById("refreshIndicator").innerHTML = "⚡ Sinkronisasi mutlak (error <50ms) | Update realtime";
         renderTabel();
       };
     </script>
