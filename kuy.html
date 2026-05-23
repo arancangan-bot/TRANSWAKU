@@ -213,6 +213,7 @@
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
     <div id="notifikasi" style="display: none"></div>
+    <div class="auto-refresh-badge" id="refreshIndicator">LIVE SYNC | ⏱️ Kunjungan: 20 menit</div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -236,18 +237,14 @@
       // ======================
       // GLOBAL STATE
       // ======================
-      let daftarData = [];          // semua data dari firestore
+      let daftarData = [];
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      let suaraDipanggil = new Map(); // id -> true jika sudah diumumkan selesai
-      
-      // Antrian panggilan suara
+      let suaraDipanggil = new Map();
       let antrianPanggilan = [];
       let sedangMemprosesAntrian = false;
-      
-      // Audio backsound
       let backsoundAudio = null;
-      
+
       // ======================
       // INISIALISASI BACKSOUND
       // ======================
@@ -256,7 +253,7 @@
         backsoundAudio.preload = "auto";
         backsoundAudio.onerror = () => console.warn("File backsound.mpeg tidak ditemukan.");
       }
-      
+
       // ======================
       // SUARA TTS
       // ======================
@@ -276,7 +273,7 @@
           }, 100);
         });
       }
-      
+
       async function speakTeks(teks) {
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
@@ -289,7 +286,7 @@
           speechSynthesis.speak(speech);
         });
       }
-      
+
       async function playSatuSiklus(nomor, nama, wbp) {
         const teks = `Mohon Perhatian. Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         if (backsoundAudio) {
@@ -298,14 +295,14 @@
         }
         await speakTeks(teks);
       }
-      
+
       async function playSuaraDenganUlang(nomor, nama, wbp) {
         await playSatuSiklus(nomor, nama, wbp);
         await playSatuSiklus(nomor, nama, wbp);
       }
-      
+
       // ======================
-      // PROSES ANTRIAN PANGGILAN (urutan nomor kecil ke besar)
+      // PROSES ANTRIAN PANGGILAN
       // ======================
       async function prosesAntrianPanggilan() {
         if (sedangMemprosesAntrian) return;
@@ -324,16 +321,16 @@
         }
         sedangMemprosesAntrian = false;
       }
-      
+
       function tambahKeAntrianPanggilan(id, nomor, nama, wbp) {
         if (antrianPanggilan.some(item => item.id === id)) return;
         antrianPanggilan.push({ id, nomor, nama, wbp });
         antrianPanggilan.sort((a, b) => a.nomor - b.nomor);
         prosesAntrianPanggilan();
       }
-      
+
       // ======================
-      // STATUS TIMER (durasi kunjungan default 20 menit = 1200 detik)
+      // STATUS TIMER (persiapan 10 detik hijau, lalu mundur 20 menit)
       // ======================
       function hitungStatus(item) {
         if (!item.createdAt) {
@@ -342,54 +339,50 @@
         const created = item.createdAt.toDate().getTime();
         const sekarang = Date.now();
         const elapsed = Math.floor((sekarang - created) / 1000);
-        // Durasi persiapan default (10 detik)
+        // Durasi persiapan (default 10 detik)
         const persiapan = (item.durasiPersiapan && !isNaN(item.durasiPersiapan)) ? item.durasiPersiapan : 10;
-        // Durasi kunjungan default 20 MENIT = 1200 DETIK
+        // Durasi kunjungan (default 20 menit = 1200 detik)
         const kunjungan = (item.durasiKunjungan && !isNaN(item.durasiKunjungan)) ? item.durasiKunjungan : 1200;
-        
+
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-          return { text: `⏳ PERSIAPAN (${10}s)`, class: "hijau", selesai: false };
+          // Tampilkan sisa detik secara dinamis, warna hijau
+          return { text: `⏳ PERSIAPAN (${sisa} detik)`, class: "hijau", selesai: false };
         }
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = sisa % 60;
-          return {
-            text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`,
-            class: sisa <= 10 ? "merah" : "hijau",
-            selesai: false
-          };
+          const teks = `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`;
+          // warna merah jika sisa <= 10 detik, hijau jika lebih
+          const kelas = sisa <= 10 ? "merah" : "hijau";
+          return { text: teks, class: kelas, selesai: false };
         }
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
-      
+
       // ======================
-      // RENDER TABEL DENGAN PISAHAN: BELUM SELESAI (ATAS) - SUDAH SELESAI (BAWAH)
-      // NOMOR ANTIAN TETAP BERDASARKAN URUTAN CREATEDAT ASC (NOMOR GLOBAL)
+      // RENDER TABEL
       // ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
         if (!tbody) return;
-        
-        // Urutkan semua data berdasarkan createdAt ASC untuk menentukan nomor antrian tetap
+
         const sortedAll = [...daftarData].sort((a, b) => {
           if (!a.createdAt) return 1;
           if (!b.createdAt) return -1;
           return a.createdAt.toDate().getTime() - b.createdAt.toDate().getTime();
         });
-        
-        // Beri nomor antrian tetap (index + 1) berdasarkan urutan masuk
+
         const dataWithFixedNumber = sortedAll.map((item, idx) => ({
           ...item,
           nomorTetap: idx + 1
         }));
-        
-        // Pisahkan berdasarkan status selesai
+
         const belumSelesai = [];
         const sudahSelesai = [];
-        
+
         for (const item of dataWithFixedNumber) {
           const status = hitungStatus(item);
           if (status.selesai) {
@@ -398,21 +391,18 @@
             belumSelesai.push({ ...item, statusObj: status });
           }
         }
-        
-        // Urutkan masing-masing kelompok berdasarkan nomorTetap (kecil ke besar)
+
         belumSelesai.sort((a, b) => a.nomorTetap - b.nomorTetap);
         sudahSelesai.sort((a, b) => a.nomorTetap - b.nomorTetap);
-        
+
         tbody.innerHTML = "";
-        
-        // Fungsi render baris
+
         function renderBaris(item, status) {
           const sudahDipanggil = suaraDipanggil.get(item.id) === true;
           if (status.selesai && !sudahDipanggil) {
             suaraDipanggil.set(item.id, true);
             tambahKeAntrianPanggilan(item.id, item.nomorTetap, item.nama, item.wbp);
           }
-          
           const namaAman = escapeHtml(item.nama);
           const wbpAman = escapeHtml(item.wbp);
           return `
@@ -425,30 +415,28 @@
             </tr>
           `;
         }
-        
-        // Bagian ATAS: Belum Selesai
+
         if (belumSelesai.length > 0) {
-          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN / PERSIAPAN</td></tr>`;
+          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN / PERSIAPAN (10 detik) → 20 menit</td></tr>`;
           for (const item of belumSelesai) {
             tbody.innerHTML += renderBaris(item, item.statusObj);
           }
         }
-        
-        // Bagian BAWAH: Sudah Selesai
+
         if (sudahSelesai.length > 0) {
           tbody.innerHTML += `<tr class="group-header"><td colspan="5">🔴 ANTRIAN SELESAI (WAKTU HABIS)</td></tr>`;
           for (const item of sudahSelesai) {
             tbody.innerHTML += renderBaris(item, item.statusObj);
           }
         }
-        
+
         if (daftarData.length === 0) {
           tbody.innerHTML = `<tr class="empty-row"><td colspan="5">✨ Tidak ada antrian aktif ✨</td></tr>`;
         }
       }
-      
+
       // ======================
-      // RESET STATE SAAT HAPUS SEMUA
+      // RESET STATE
       // ======================
       async function resetSemuaState() {
         antrianPanggilan = [];
@@ -460,7 +448,7 @@
         }
         panggilanTerakhir = null;
       }
-      
+
       // ======================
       // FUNGSI GLOBAL
       // ======================
@@ -471,7 +459,7 @@
         antrianPanggilan = antrianPanggilan.filter(item => item.id !== id);
         tampilNotif("✅ Terhapus", "Antrian dihapus", "#2a7f62");
       };
-      
+
       window.hapusSemuaData = async function () {
         if (!confirm("⚠️ Hapus SEMUA antrian? Tindakan tidak bisa dibatalkan.")) return;
         await resetSemuaState();
@@ -482,7 +470,7 @@
         suaraDipanggil.clear();
         tampilNotif("🗑️ Semua Data Dihapus", "Dashboard telah dibersihkan", "#b91c1c");
       };
-      
+
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
           tampilNotif("Info", "Belum ada panggilan selesai yang tercatat", "#1e466e");
@@ -491,19 +479,16 @@
         await playSuaraDenganUlang(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
         tampilNotif("🔁 Ulang Panggilan", `No. ${panggilanTerakhir.nomor} - ${panggilanTerakhir.nama}`, "#2d5f3e");
       };
-      
+
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
-      
-      // ======================
-      // HELPER
-      // ======================
+
       function escapeHtml(str) {
         if (!str) return "";
         return str.replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
       }
-      
+
       function tampilNotif(judul, pesan, warna) {
         const box = document.getElementById("notifikasi");
         box.innerHTML = `
@@ -514,7 +499,7 @@
         box.style.display = "block";
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
-      
+
       // ======================
       // REALTIME LISTENER
       // ======================
@@ -524,32 +509,26 @@
           newData.push({ id: docSnap.id, ...docSnap.data() });
         });
         daftarData = newData;
-        
-        // Bersihkan suaraDipanggil untuk ID yang sudah tidak ada
+
         const idsExist = new Set(daftarData.map(d => d.id));
         for (let id of suaraDipanggil.keys()) {
           if (!idsExist.has(id)) suaraDipanggil.delete(id);
         }
         antrianPanggilan = antrianPanggilan.filter(item => idsExist.has(item.id));
-        
+
         renderTabel();
       });
-      
-      // Update timer tiap detik
+
       setInterval(() => {
         renderTabel();
       }, 1000);
-      
-      // ======================
-      // INITIALISASI
-      // ======================
+
       window.onload = async function () {
         initBacksound();
         await getSuaraPerempuan();
-        tampilNotif("🕒 Durasi Kunjungan Default", "20 menit (1200 detik) untuk antrian baru", "#d97706");
+        tampilNotif("🕒 Durasi", "Persiapan 10 detik (hijau) → Kunjungan 20 menit", "#d97706");
       };
-      
-      // Aktifkan audio context setelah interaksi user pertama
+
       function enableAudioContext() {
         if (backsoundAudio) {
           backsoundAudio.play().then(() => {
@@ -565,4 +544,3 @@
     </script>
   </body>
 </html>
-```
