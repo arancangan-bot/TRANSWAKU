@@ -5,11 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
     <title>Jamkot | Dashboard Antrian - Lapas Cikarang</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
         font-family: "Segoe UI", system-ui;
         min-height: 100vh;
@@ -44,23 +40,10 @@
         flex-wrap: wrap;
         border-bottom: 4px solid #facc15;
       }
-      .logo-left,
-      .logo-right {
-        padding: 8px 16px;
-      }
-      .judul-utama {
-        text-align: center;
-        flex: 1;
-      }
-      .judul-utama h2 {
-        text-shadow: 2px 2px 5px black;
-        color: #ffe484;
-      }
-      .logo-left img,
-      .logo-right img {
-        height: 90px;
-        object-fit: contain;
-      }
+      .logo-left, .logo-right { padding: 8px 16px; }
+      .judul-utama { text-align: center; flex: 1; }
+      .judul-utama h2 { text-shadow: 2px 2px 5px black; color: #ffe484; }
+      .logo-left img, .logo-right img { height: 90px; object-fit: contain; }
       .toolbar-area {
         display: flex;
         flex-wrap: wrap;
@@ -78,19 +61,10 @@
         cursor: pointer;
         transition: 0.2s;
       }
-      button:hover {
-        transform: translateY(-2px);
-        filter: brightness(1.05);
-      }
-      .btn-input-page {
-        background: #2a7f62;
-      }
-      .btn-repeat-last {
-        background: #2d5f3e;
-      }
-      .btn-fullscreen {
-        background: #6b21a5;
-      }
+      button:hover { transform: translateY(-2px); filter: brightness(1.05); }
+      .btn-input-page { background: #2a7f62; }
+      .btn-repeat-last { background: #2d5f3e; }
+      .btn-fullscreen { background: #6b21a5; }
       .table-wrapper {
         overflow-x: auto;
         max-height: 520px;
@@ -109,10 +83,7 @@
         position: sticky;
         top: 0;
       }
-      td {
-        padding: 12px 8px;
-        border-bottom: 1px solid #e2e8f0;
-      }
+      td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
       .merah {
         background: #fee2e2;
         color: #dc2626;
@@ -132,10 +103,7 @@
         padding: 6px 18px;
         border-radius: 30px;
       }
-      .hapus-semua-wrapper {
-        text-align: center;
-        margin-top: 20px;
-      }
+      .hapus-semua-wrapper { text-align: center; margin-top: 20px; }
       .auto-refresh-badge {
         position: fixed;
         bottom: 15px;
@@ -149,14 +117,8 @@
         z-index: 999;
       }
       @media (max-width: 700px) {
-        .logo-left img,
-        .logo-right img {
-          height: 60px;
-        }
-        button {
-          padding: 8px 16px;
-          font-size: 0.8rem;
-        }
+        .logo-left img, .logo-right img { height: 60px; }
+        button { padding: 8px 16px; font-size: 0.8rem; }
       }
     </style>
   </head>
@@ -178,15 +140,7 @@
       </div>
       <div class="table-wrapper">
         <table>
-          <thead>
-            <tr>
-              <th>No. Antrian</th>
-              <th>Nama Pengunjung</th>
-              <th>Nama WBP</th>
-              <th>Status / Waktu</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
+          <thead><tr><th>No. Antrian</th><th>Nama Pengunjung</th><th>Nama WBP</th><th>Status / Waktu</th><th>Aksi</th></tr></thead>
           <tbody id="tabelData"></tbody>
         </table>
       </div>
@@ -215,11 +169,8 @@
       let daftarData = [];
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      
-      // Queue untuk mencegah tabrakan suara
       let callQueue = [];
       let isProcessingQueue = false;
-
       let serverTimeOffset = 0;
       let isOffsetReady = false;
 
@@ -227,16 +178,12 @@
       async function calibrateServerTime() {
         const savedOffset = localStorage.getItem("serverTimeOffset");
         const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
-        if (savedOffset && savedTime) {
-          const age = Date.now() - parseInt(savedTime);
-          if (age < 5 * 60 * 1000) {
-            serverTimeOffset = parseInt(savedOffset);
-            isOffsetReady = true;
-            console.log("✅ Pakai offset dari localStorage:", serverTimeOffset, "ms");
-            return;
-          }
+        if (savedOffset && savedTime && (Date.now() - parseInt(savedTime) < 5 * 60 * 1000)) {
+          serverTimeOffset = parseInt(savedOffset);
+          isOffsetReady = true;
+          console.log("✅ Pakai offset dari localStorage:", serverTimeOffset, "ms");
+          return;
         }
-
         const samples = [];
         for (let i = 0; i < 5; i++) {
           try {
@@ -251,57 +198,34 @@
             const offset = serverTime - clientTime;
             samples.push(offset);
             await deleteDoc(tempRef);
-          } catch (e) {
-            console.warn("Ping gagal", e);
-          }
+          } catch (e) { console.warn("Ping gagal", e); }
           await new Promise(r => setTimeout(r, 100));
         }
-
-        if (samples.length === 0) {
-          serverTimeOffset = 0;
-          isOffsetReady = true;
-          return;
-        }
-
+        if (samples.length === 0) { serverTimeOffset = 0; isOffsetReady = true; return; }
         samples.sort((a, b) => a - b);
-        const median = samples[Math.floor(samples.length / 2)];
-        serverTimeOffset = median;
-        
+        serverTimeOffset = samples[Math.floor(samples.length / 2)];
         localStorage.setItem("serverTimeOffset", serverTimeOffset);
         localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
         isOffsetReady = true;
         console.log("🔄 Kalibrasi selesai, offset median:", serverTimeOffset, "ms");
       }
-
-      function getCurrentServerTime() {
-        return Date.now() + serverTimeOffset;
-      }
-
-      setInterval(async () => {
-        if (isOffsetReady) {
-          await calibrateServerTime();
-          renderTabel();
-        }
-      }, 30000);
+      function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
+      setInterval(async () => { if (isOffsetReady) { await calibrateServerTime(); renderTabel(); } }, 30000);
 
       // ====================== SUARA & BACKSOUND ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
-          if (suaraPerempuan) {
-            resolve(suaraPerempuan);
-            return;
-          }
+          if (suaraPerempuan) { resolve(suaraPerempuan); return; }
           const cek = setInterval(() => {
             const voices = speechSynthesis.getVoices();
             if (voices.length) {
               clearInterval(cek);
-              suaraPerempuan = voices.find((v) => v.lang === "id-ID") || voices[0];
+              suaraPerempuan = voices.find(v => v.lang === "id-ID") || voices[0];
               resolve(suaraPerempuan);
             }
           }, 100);
         });
       }
-
       async function playSuara(nomor, nama, wbp) {
         const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung Atas Nama ${nama} Kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
@@ -311,14 +235,11 @@
         speech.voice = await getSuaraPerempuan();
         speechSynthesis.speak(speech);
       }
-
       function putarBacksound() {
         const audio = new Audio("backsound.mpeg");
         audio.play().catch(e => console.warn("Gagal putar backsound:", e));
         console.log("🔊 Backsound diputar");
       }
-
-      // Panggilan otomatis: 2 kali (backsound + suara, jeda 1 detik, ulang)
       async function panggilDuaKali(nomor, nama, wbp) {
         putarBacksound();
         await playSuara(nomor, nama, wbp);
@@ -326,64 +247,47 @@
         putarBacksound();
         await playSuara(nomor, nama, wbp);
       }
-
-      // Panggilan manual (tombol ulang): cukup sekali
       async function panggilSekali(nomor, nama, wbp) {
         putarBacksound();
         await playSuara(nomor, nama, wbp);
       }
 
-      // ====================== QUEUE UNTUK ANTRIAN PANGGILAN ======================
+      // ====================== QUEUE (ANTRIAN PANGGILAN) ======================
       async function processQueue() {
         if (isProcessingQueue) return;
         isProcessingQueue = true;
         while (callQueue.length > 0) {
           const task = callQueue.shift();
-          try {
-            await task();
-          } catch (err) {
-            console.error("Error saat memproses panggilan:", err);
-          }
-          // Jeda kecil antar antrian untuk memastikan tidak tumpang tindih
-          await new Promise(resolve => setTimeout(resolve, 500));
+          try { await task(); } catch (err) { console.error(err); }
+          await new Promise(resolve => setTimeout(resolve, 500)); // jeda antar antrian
         }
         isProcessingQueue = false;
       }
-
-      function addToQueue(callFunction, ...args) {
-        callQueue.push(() => callFunction(...args));
+      function addToQueue(fn, ...args) {
+        callQueue.push(() => fn(...args));
         processQueue();
       }
 
       // ====================== STATUS TIMER ======================
       function hitungStatus(item) {
-        if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
-          return { text: "⏳ Memuat...", class: "hijau" };
-        }
+        if (!item.createdAt || typeof item.createdAt.toDate !== 'function') return { text: "⏳ Memuat...", class: "hijau" };
         const serverCreated = item.createdAt.toDate().getTime();
         const serverNow = getCurrentServerTime();
         let elapsed = (serverNow - serverCreated) / 1000;
         if (elapsed < 0) elapsed = 0;
-        
         const persiapan = item.durasiPersiapan || 10;
         const kunjungan = item.durasiKunjungan || 300;
-        
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
         }
-        
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = Math.floor(sisa % 60);
-          return { 
-            text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, 
-            class: sisa <= 10 ? "merah" : "" 
-          };
+          return { text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, class: sisa <= 10 ? "merah" : "" };
         }
-        
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
@@ -394,40 +298,23 @@
           document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
           return;
         }
-        
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
-        
         const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
-        
         for (const item of sortedData) {
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor;
-          if (!nomorAntrian || nomorAntrian === 0) {
-            nomorAntrian = "—";
-          }
+          if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
-          // Jika waktu habis dan belum dipanggil, masukkan ke antrian
           if (status.selesai && !item.sudahDipanggil) {
-            // Tandai sudah dipanggil di Firestore agar tidak masuk antrian lagi
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
-            } catch (err) {
-              console.error("Gagal update sudahDipanggil:", err);
-            }
-            
-            panggilanTerakhir = {
-              nomor: nomorAntrian,
-              nama: item.nama,
-              wbp: item.wbp,
-            };
-            
-            // Tambahkan ke queue (panggil dua kali otomatis)
+            } catch (err) { console.error(err); }
+            panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
             addToQueue(panggilDuaKali, nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
-          
           tbody.innerHTML += `
             <tr>
               <td>${nomorAntrian}</td>
@@ -438,18 +325,10 @@
             </tr>
           `;
         }
-        
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
-        renderRequestId = requestAnimationFrame(() => {
-          setTimeout(() => renderTabel(), 100);
-        });
+        renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 100); });
       }
-
-      function escapeHtml(str) {
-        if (!str) return "";
-        return str.replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
-      }
-
+      function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
       function tampilNotif(judul, pesan, warna) {
         const box = document.getElementById("notifikasi");
         box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
@@ -462,28 +341,20 @@
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
       };
-
       window.hapusSemuaData = async function () {
         if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0, antrian berikutnya mulai dari nomor 1")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
-        snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
+        snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
-        // Reset counter
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
         tampilNotif("🗑️ SEMUA DATA TERHAPUS & COUNTER DI RESET", "Antrian berikutnya mulai nomor 1", "#1e466e");
       };
-
-      // Tombol ulangi: hanya SEKALI, juga melalui queue agar tidak tabrakan
       window.ulangiPanggilanTerakhir = async function () {
-        if (!panggilanTerakhir) {
-          alert("Belum ada panggilan selesai.");
-          return;
-        }
+        if (!panggilanTerakhir) { alert("Belum ada panggilan selesai."); return; }
         addToQueue(panggilSekali, panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
       };
-
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
@@ -491,9 +362,7 @@
       // ====================== FIRESTORE LISTENER ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
-        snapshot.forEach((doc) => {
-          newData.push({ id: doc.id, ...doc.data() });
-        });
+        snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
         daftarData = newData;
         renderTabel();
       });
