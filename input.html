@@ -136,7 +136,7 @@
     <div id="notifTemp"></div>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -170,6 +170,33 @@
         setTimeout(() => { div.remove(); }, 3000);
       }
 
+      // ====================== GENERATE NOMOR ANTRIAN (INCREMENTAL) ======================
+      async function getNextNomor() {
+        const counterRef = doc(db, "counter", "antrianCounter");
+        try {
+          const result = await runTransaction(db, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            let current = 1;
+            if (counterDoc.exists()) {
+              current = counterDoc.data().value + 1;
+            }
+            transaction.set(counterRef, { value: current });
+            return current;
+          });
+          return result;
+        } catch (error) {
+          console.error("Gagal mendapatkan nomor antrian:", error);
+          // Fallback: cari nomor tertinggi dari koleksi antrian
+          const snapshot = await getDocs(collection(db, "antrian"));
+          let max = 0;
+          snapshot.forEach(doc => {
+            const nomor = doc.data().nomor || 0;
+            if (nomor > max) max = nomor;
+          });
+          return max + 1;
+        }
+      }
+
       window.tambahAntrianBaru = async function () {
         let nama = document.getElementById("namaPengunjung").value.trim();
         let wbp = document.getElementById("namaWbp").value.trim();
@@ -180,16 +207,18 @@
         }
 
         try {
+          const nomorBaru = await getNextNomor();
           await addDoc(collection(db, "antrian"), {
+            nomor: nomorBaru,
             nama: nama,
             wbp: wbp,
             status: "persiapan",
             createdAt: serverTimestamp(),
-            durasiPersiapan: 10,        // 10 detik persiapan
-            durasiKunjungan: 300,       // 5 menit = 300 detik
+            durasiPersiapan: 10,
+            durasiKunjungan: 300,
           });
 
-          tampilNotif(`✅ Antrian berhasil ditambahkan (durasi kunjungan 5 menit)`);
+          tampilNotif(`✅ Antrian berhasil ditambahkan (Nomor: ${nomorBaru})`);
           document.getElementById("namaPengunjung").value = "";
           document.getElementById("namaWbp").value = "";
           document.getElementById("namaPengunjung").focus();
