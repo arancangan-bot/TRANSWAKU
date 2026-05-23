@@ -185,13 +185,11 @@
 
         try {
           // DURASI KUNJUNGAN DI SET 5 MENIT = 300 DETIK
-          // DURASI PERSIAPAN TETAP 10 DETIK
           await addDoc(collection(db, "antrian"), {
             nama: nama,
             wbp: wbp,
             status: "persiapan",
             createdAt: serverTimestamp(),
-            durasiPersiapan: 10,        // 10 detik persiapan
             durasiKunjungan: 300,       // 5 MENIT (300 detik) sesuai permintaan
           });
 
