@@ -217,12 +217,14 @@
       let suaraPerempuan = null;
       let suaraDipanggil = {};
       
-      let serverTimeOffset = 0;      // ms (serverTime = clientTime + offset)
+      // Untuk backsound (hanya diputar sekali menjelang habis)
+      let backsoundPlayedMap = {}; // key: item.id, value: true/false
+      
+      let serverTimeOffset = 0;
       let isOffsetReady = false;
 
-      // ====================== KALIBRASI SERVER TIME (5 SAMPEL, MEDIAN) ======================
+      // ====================== KALIBRASI SERVER TIME ======================
       async function calibrateServerTime() {
-        // Cek localStorage (berlaku 5 menit)
         const savedOffset = localStorage.getItem("serverTimeOffset");
         const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
         if (savedOffset && savedTime) {
@@ -235,7 +237,6 @@
           }
         }
 
-        // Lakukan 5 kali ping, ambil median RTT
         const samples = [];
         for (let i = 0; i < 5; i++) {
           try {
@@ -253,7 +254,6 @@
           } catch (e) {
             console.warn("Ping gagal", e);
           }
-          // Jeda 100ms antar ping
           await new Promise(r => setTimeout(r, 100));
         }
 
@@ -263,12 +263,10 @@
           return;
         }
 
-        // Median
         samples.sort((a, b) => a - b);
         const median = samples[Math.floor(samples.length / 2)];
         serverTimeOffset = median;
         
-        // Simpan
         localStorage.setItem("serverTimeOffset", serverTimeOffset);
         localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
         isOffsetReady = true;
@@ -279,15 +277,14 @@
         return Date.now() + serverTimeOffset;
       }
 
-      // Rekalibrasi berkala setiap 30 detik
       setInterval(async () => {
         if (isOffsetReady) {
           await calibrateServerTime();
-          renderTabel(); // refresh tampilan
+          renderTabel();
         }
       }, 30000);
 
-      // ====================== SUARA ======================
+      // ====================== SUARA & BACKSOUND ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if (suaraPerempuan) {
@@ -306,7 +303,7 @@
       }
 
       async function playSuara(nomor, nama, wbp) {
-        const teks = `Mohon Perhatian. Nomor antrian ${nomor},Pengunjung Atas Nama ${nama} Kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
+        const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung Atas Nama ${nama} Kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
         speech.rate = 0.92;
@@ -315,14 +312,22 @@
         speechSynthesis.speak(speech);
       }
 
-      // ====================== STATUS TIMER (PRESISI DETIK) ======================
+      function putarBacksound(id) {
+        if (backsoundPlayedMap[id]) return;
+        backsoundPlayedMap[id] = true;
+        const audio = new Audio("backsound.mpeg");
+        audio.play().catch(e => console.warn("Gagal putar backsound:", e));
+        console.log("🔊 Backsound diputar untuk antrian", id);
+      }
+
+      // ====================== STATUS TIMER ======================
       function hitungStatus(item) {
         if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
           return { text: "⏳ Memuat...", class: "hijau" };
         }
         const serverCreated = item.createdAt.toDate().getTime();
         const serverNow = getCurrentServerTime();
-        let elapsed = (serverNow - serverCreated) / 1000; // dalam detik, bisa pecahan
+        let elapsed = (serverNow - serverCreated) / 1000;
         if (elapsed < 0) elapsed = 0;
         
         const persiapan = item.durasiPersiapan || 10;
@@ -338,6 +343,10 @@
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = Math.floor(sisa % 60);
+          // Cek apakah perlu putar backsound (sisa <= 3 detik dan belum diputar)
+          if (sisa <= 3 && !backsoundPlayedMap[item.id]) {
+            putarBacksound(item.id);
+          }
           return { 
             text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, 
             class: sisa <= 10 ? "merah" : "" 
@@ -347,7 +356,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER DENGAN ANIMATION FRAME ======================
+      // ====================== RENDER ======================
       let renderRequestId = null;
       function renderTabel() {
         if (!isOffsetReady) {
@@ -389,7 +398,6 @@
           `;
         });
         
-        // Jadwalkan render ulang setiap 0.1 detik untuk presisi tinggi
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
         renderRequestId = requestAnimationFrame(() => {
           setTimeout(() => renderTabel(), 100);
@@ -413,6 +421,7 @@
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
         delete suaraDipanggil[id];
+        delete backsoundPlayedMap[id];
       };
 
       window.hapusSemuaData = async function () {
@@ -422,6 +431,7 @@
         snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
         suaraDipanggil = {};
+        backsoundPlayedMap = {};
       };
 
       window.ulangiPanggilanTerakhir = async function () {
@@ -450,7 +460,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "⚡ Sinkronisasi mutlak (error <50ms) | Update realtime";
+        document.getElementById("refreshIndicator").innerHTML = "⚡ Sinkronisasi mutlak + Backsound peringatan 3 detik sebelum habis";
         renderTabel();
       };
     </script>
