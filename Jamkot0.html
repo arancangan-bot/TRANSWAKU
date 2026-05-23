@@ -258,17 +258,17 @@
         if (item.createdAt && typeof item.createdAt.toDate === 'function') {
           createdTime = item.createdAt.toDate().getTime();
         } else if (item.createdAt && item.createdAt.seconds) {
-          createdTime = item.createdAt.seconds * 1000;
+          createdTime = item.createdAt.seconds * ;
         }
         
-        const elapsed = Math.floor((Date.now() - createdTime) / 1000);
+        const elapsed = Math.floor((Date.now() - createdTime) /);
         const persiapan = item.durasiPersiapan || 10;        // 10 detik persiapan
         const kunjungan = item.durasiKunjungan || 300;      // 5 MENIT = 300 detik
         
         // Tahap PERSIAPAN (10 detik)
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-          return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau" };
+          return { text: `⏳ PERSIAPAN (${10}s)`, class: "hijau" };
         }
         
         // Tahap KUNJUNGAN (5 menit countdown)
@@ -279,7 +279,7 @@
           const detik = sisa % 60;
           // Tampilkan menit:detik dengan format MM:SS
           return { 
-            text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`, 
+            text: `⏱️ ${5}:${detik.toString().padStart(2, "0")}`, 
             class: sisa <= 10 ? "merah" : "" 
           };
         }
