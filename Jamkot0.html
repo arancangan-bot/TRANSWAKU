@@ -217,8 +217,7 @@
       let suaraPerempuan = null;
       let suaraDipanggil = {};
       
-      // Untuk backsound (hanya diputar sekali menjelang habis)
-      let backsoundPlayedMap = {}; // key: item.id, value: true/false
+      let backsoundPlayedMap = {};
       
       let serverTimeOffset = 0;
       let isOffsetReady = false;
@@ -343,7 +342,6 @@
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = Math.floor(sisa % 60);
-          // Cek apakah perlu putar backsound (sisa <= 3 detik dan belum diputar)
           if (sisa <= 3 && !backsoundPlayedMap[item.id]) {
             putarBacksound(item.id);
           }
@@ -356,7 +354,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER ======================
+      // ====================== RENDER DENGAN NOMOR URUT TERBALIK ======================
       let renderRequestId = null;
       function renderTabel() {
         if (!isOffsetReady) {
@@ -367,36 +365,42 @@
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         
+        // Urutkan dari yang PALING LAMA ke PALING BARU (ascending createdAt)
         const sortedData = [...daftarData].sort((a, b) => {
           let timeA = a.createdAt?.toDate?.()?.getTime() || 0;
           let timeB = b.createdAt?.toDate?.()?.getTime() || 0;
           return timeA - timeB;
         });
         
-        sortedData.forEach((item, index) => {
+        const total = sortedData.length;
+        // Looping dari data terbaru (index tertinggi) ke terlama, agar baris terbawah mendapat nomor 1
+        for (let i = total - 1; i >= 0; i--) {
+          const item = sortedData[i];
+          const nomorUrut = total - i; // baris paling bawah = 1, ke atas bertambah
           const status = hitungStatus(item);
           
+          // Panggil suara jika selesai (periksa apakah sudah dipanggil)
           if (status.selesai && !suaraDipanggil[item.id]) {
             suaraDipanggil[item.id] = true;
             panggilanTerakhir = {
-              nomor: index + 1,
+              nomor: nomorUrut,
               nama: item.nama,
               wbp: item.wbp,
             };
-            playSuara(index + 1, item.nama, item.wbp);
+            playSuara(nomorUrut, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           
           tbody.innerHTML += `
             <tr>
-              <td>${index + 1}</td>
+              <td>${nomorUrut}</td>
               <td>${escapeHtml(item.nama)}</td>
               <td>${escapeHtml(item.wbp)}</td>
               <td><span class="${status.class}">${status.text}</span></td>
               <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
             </tr>
           `;
-        });
+        }
         
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
         renderRequestId = requestAnimationFrame(() => {
@@ -460,7 +464,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "⚡ Sinkronisasi mutlak + Backsound peringatan 3 detik sebelum habis";
+        document.getElementById("refreshIndicator").innerHTML = "⚡ Antrian terbaru di bawah (No. 1) | Backsound 3 detik sebelum habis";
         renderTabel();
       };
     </script>
