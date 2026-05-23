@@ -1,3 +1,5 @@
+Berikut adalah kode dashboard dengan **durasi kunjungan default diubah menjadi 20 menit (1200 detik)**. Persiapan tetap 5 menit. Semua antrian baru yang ditambahkan (melalui halaman input) akan mengikuti durasi ini, dan antrian lama tetap menggunakan durasi masing-masing.
+```html
 <!doctype html>
 <html lang="id">
   <head>
@@ -168,6 +170,16 @@
         background-color: #e2e8f0;
         padding: 8px;
       }
+      .info-durasi {
+        background: #facc15;
+        color: #1e3c4a;
+        padding: 5px 12px;
+        border-radius: 40px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        display: inline-block;
+        margin-left: 10px;
+      }
     </style>
   </head>
   <body>
@@ -203,7 +215,7 @@
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
     <div id="notifikasi" style="display: none"></div>
-    <div class="auto-refresh-badge" id="refreshIndicator">LIVE SYNC</div>
+    <div class="auto-refresh-badge" id="refreshIndicator">LIVE SYNC | ⏱️ Kunjungan: 20 menit (default)</div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -324,7 +336,7 @@
       }
       
       // ======================
-      // STATUS TIMER
+      // STATUS TIMER (durasi kunjungan default 20 menit = 1200 detik)
       // ======================
       function hitungStatus(item) {
         if (!item.createdAt) {
@@ -333,8 +345,10 @@
         const created = item.createdAt.toDate().getTime();
         const sekarang = Date.now();
         const elapsed = Math.floor((sekarang - created) / 1000);
-        const persiapan = item.durasiPersiapan || 300;
-        const kunjungan = item.durasiKunjungan || 600;
+        // Durasi persiapan default 5 menit (300 detik)
+        const persiapan = (item.durasiPersiapan && !isNaN(item.durasiPersiapan)) ? item.durasiPersiapan : 300;
+        // Durasi kunjungan default 20 MENIT = 1200 DETIK
+        const kunjungan = (item.durasiKunjungan && !isNaN(item.durasiKunjungan)) ? item.durasiKunjungan : 1200;
         
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
@@ -417,7 +431,6 @@
         
         // Bagian ATAS: Belum Selesai
         if (belumSelesai.length > 0) {
-          // Optional: tambahkan label grup (tidak wajib, tapi memperjelas)
           tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN / PERSIAPAN</td></tr>`;
           for (const item of belumSelesai) {
             tbody.innerHTML += renderBaris(item, item.statusObj);
@@ -433,7 +446,7 @@
         }
         
         if (daftarData.length === 0) {
-          tbody.innerHTML = `<tr class="empty-row"><td colspan="5"></td></tr>`;
+          tbody.innerHTML = `<tr class="empty-row"><td colspan="5">✨ Tidak ada antrian aktif ✨</td></tr>`;
         }
       }
       
@@ -536,6 +549,7 @@
       window.onload = async function () {
         initBacksound();
         await getSuaraPerempuan();
+        tampilNotif("🕒 Durasi Kunjungan Default", "20 menit (1200 detik) untuk antrian baru", "#d97706");
       };
       
       // Aktifkan audio context setelah interaksi user pertama
@@ -554,3 +568,4 @@
     </script>
   </body>
 </html>
+```
