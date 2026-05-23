@@ -346,7 +346,7 @@
           const menit = Math.floor(sisa / 60);
           const detik = sisa % 60;
           return {
-            text: `⏱️ ${5}:${detik.toString().padStart(2, "0")}`,
+            text: `⏱️ ${120}:${detik.toString().padStart(2, "0")}`,
             class: sisa <= 10 ? "merah" : "hijau",
             selesai: false
           };
