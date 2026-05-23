@@ -258,10 +258,10 @@
         if (item.createdAt && typeof item.createdAt.toDate === 'function') {
           createdTime = item.createdAt.toDate().getTime();
         } else if (item.createdAt && item.createdAt.seconds) {
-          createdTime = item.createdAt.seconds * ;
+          createdTime = item.createdAt.seconds * 1000;
         }
         
-        const elapsed = Math.floor((Date.now() - createdTime) /);
+        const elapsed = Math.floor((Date.now() - createdTime) /1000);
         const persiapan = item.durasiPersiapan || 10;        // 10 detik persiapan
         const kunjungan = item.durasiKunjungan || 300;      // 5 MENIT = 300 detik
         
@@ -279,7 +279,7 @@
           const detik = sisa % 60;
           // Tampilkan menit:detik dengan format MM:SS
           return { 
-            text: `⏱️ ${5}:${detik.toString().padStart(2, "0")}`, 
+            text: `⏱️ ${10}:${detik.toString().padStart(2, "0")}`, 
             class: sisa <= 10 ? "merah" : "" 
           };
         }
