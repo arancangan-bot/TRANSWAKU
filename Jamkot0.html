@@ -215,8 +215,11 @@
       let daftarData = [];
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      let isCallingInProgress = new Map();
       
+      // Queue untuk mencegah tabrakan suara
+      let callQueue = [];
+      let isProcessingQueue = false;
+
       let serverTimeOffset = 0;
       let isOffsetReady = false;
 
@@ -315,7 +318,7 @@
         console.log("🔊 Backsound diputar");
       }
 
-      // Panggilan otomatis: 2 kali
+      // Panggilan otomatis: 2 kali (backsound + suara, jeda 1 detik, ulang)
       async function panggilDuaKali(nomor, nama, wbp) {
         putarBacksound();
         await playSuara(nomor, nama, wbp);
@@ -328,6 +331,28 @@
       async function panggilSekali(nomor, nama, wbp) {
         putarBacksound();
         await playSuara(nomor, nama, wbp);
+      }
+
+      // ====================== QUEUE UNTUK ANTRIAN PANGGILAN ======================
+      async function processQueue() {
+        if (isProcessingQueue) return;
+        isProcessingQueue = true;
+        while (callQueue.length > 0) {
+          const task = callQueue.shift();
+          try {
+            await task();
+          } catch (err) {
+            console.error("Error saat memproses panggilan:", err);
+          }
+          // Jeda kecil antar antrian untuk memastikan tidak tumpang tindih
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        isProcessingQueue = false;
+      }
+
+      function addToQueue(callFunction, ...args) {
+        callQueue.push(() => callFunction(...args));
+        processQueue();
       }
 
       // ====================== STATUS TIMER ======================
@@ -382,15 +407,9 @@
             nomorAntrian = "—";
           }
           
-          if (status.selesai && !item.sudahDipanggil && !isCallingInProgress.get(item.id)) {
-            isCallingInProgress.set(item.id, true);
-            
-            panggilanTerakhir = {
-              nomor: nomorAntrian,
-              nama: item.nama,
-              wbp: item.wbp,
-            };
-            
+          // Jika waktu habis dan belum dipanggil, masukkan ke antrian
+          if (status.selesai && !item.sudahDipanggil) {
+            // Tandai sudah dipanggil di Firestore agar tidak masuk antrian lagi
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
@@ -398,11 +417,15 @@
               console.error("Gagal update sudahDipanggil:", err);
             }
             
-            // Panggil 2 kali otomatis
-            panggilDuaKali(nomorAntrian, item.nama, item.wbp);
-            tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
+            panggilanTerakhir = {
+              nomor: nomorAntrian,
+              nama: item.nama,
+              wbp: item.wbp,
+            };
             
-            isCallingInProgress.delete(item.id);
+            // Tambahkan ke queue (panggil dua kali otomatis)
+            addToQueue(panggilDuaKali, nomorAntrian, item.nama, item.wbp);
+            tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           
           tbody.innerHTML += `
@@ -438,7 +461,6 @@
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
-        isCallingInProgress.delete(id);
       };
 
       window.hapusSemuaData = async function () {
@@ -450,17 +472,16 @@
         // Reset counter
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        isCallingInProgress.clear();
         tampilNotif("🗑️ SEMUA DATA TERHAPUS & COUNTER DI RESET", "Antrian berikutnya mulai nomor 1", "#1e466e");
       };
 
-      // Tombol ulangi: hanya SEKALI
+      // Tombol ulangi: hanya SEKALI, juga melalui queue agar tidak tabrakan
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
           alert("Belum ada panggilan selesai.");
           return;
         }
-        await panggilSekali(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+        addToQueue(panggilSekali, panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
       };
 
       window.toggleFullscreen = function () {
@@ -481,7 +502,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound & suara 2x otomatis | Ulang sekali | Reset counter";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Antrian panggilan (tidak tabrakan) | Backsound duluan | Urutan DESC";
         renderTabel();
       };
     </script>
