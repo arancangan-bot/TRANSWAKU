@@ -220,7 +220,6 @@
             const voices = speechSynthesis.getVoices();
             if (voices.length) {
               clearInterval(cek);
-              // Prioritaskan suara wanita Indonesia
               let preferred = voices.find(v => v.lang === "id-ID" && (v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("perempuan")));
               if (!preferred) preferred = voices.find(v => v.lang === "id-ID");
               if (!preferred) preferred = voices.find(v => v.lang.startsWith("id"));
@@ -244,19 +243,14 @@
       function putarBacksound() {
         const audio = new Audio("backsound.mpeg");
         audio.play().catch(e => console.warn("Gagal putar backsound:", e));
-        console.log("🔊 Backsound diputar");
+        console.log("🔊 Backsound diputar (sekali)");
       }
 
-      // SATU SIKLUS: Backsound -> jeda 3 detik -> Suara
-      async function satuSiklus(nomor, nama, wbp) {
-        putarBacksound();                // backsound di awal
-        await new Promise(resolve => setTimeout(resolve, 3000)); // jeda 3 detik
-        await playSuara(nomor, nama, wbp);
-      }
-
-      // Panggilan otomatis (waktu habis) dan tombol ulangi: cukup satu siklus
+      // Satu kali panggilan: backsound -> jeda 3 detik -> suara
       async function panggilSekali(nomor, nama, wbp) {
-        await satuSiklus(nomor, nama, wbp);
+        putarBacksound();
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await playSuara(nomor, nama, wbp);
       }
 
       // ====================== QUEUE (ANTRIAN PANGGILAN) ======================
@@ -266,7 +260,7 @@
         while (callQueue.length > 0) {
           const task = callQueue.shift();
           try { await task(); } catch (err) { console.error(err); }
-          await new Promise(resolve => setTimeout(resolve, 500)); // jeda antar antrian
+          await new Promise(resolve => setTimeout(resolve, 500)); // jeda antar antrian berbeda
         }
         isProcessingQueue = false;
       }
@@ -313,11 +307,17 @@
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
+          // Hanya panggil sekali jika sudah selesai dan belum dipanggil
           if (status.selesai && !item.sudahDipanggil) {
+            // Tandai sudah dipanggil di Firestore (atomic)
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
-            } catch (err) { console.error(err); }
+            } catch (err) { 
+              console.error("Gagal update sudahDipanggil:", err);
+              // Jika gagal update karena conflict, jangan lanjutkan panggilan
+              if (err.code === 'already-exists') continue;
+            }
             panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
             addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
@@ -378,7 +378,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound sekali → jeda 3dt → suara | Antrean tidak tabrakan";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound SEKALI → jeda 3dt → suara | Antrean aman";
         renderTabel();
       };
     </script>
