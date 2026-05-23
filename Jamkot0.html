@@ -220,6 +220,7 @@
             const voices = speechSynthesis.getVoices();
             if (voices.length) {
               clearInterval(cek);
+              // Prioritaskan suara wanita Indonesia
               let preferred = voices.find(v => v.lang === "id-ID" && (v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("perempuan")));
               if (!preferred) preferred = voices.find(v => v.lang === "id-ID");
               if (!preferred) preferred = voices.find(v => v.lang.startsWith("id"));
@@ -246,33 +247,26 @@
         console.log("🔊 Backsound diputar");
       }
 
-      // Satu siklus: backsound sekali -> jeda 3 detik -> suara
+      // SATU SIKLUS: Backsound -> jeda 3 detik -> Suara
       async function satuSiklus(nomor, nama, wbp) {
-        putarBacksound();
+        putarBacksound();                // backsound di awal
         await new Promise(resolve => setTimeout(resolve, 3000)); // jeda 3 detik
         await playSuara(nomor, nama, wbp);
       }
 
-      // Panggilan otomatis (waktu habis): 2 siklus, jeda 1 detik antar siklus
-      async function panggilDuaKali(nomor, nama, wbp) {
-        await satuSiklus(nomor, nama, wbp);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await satuSiklus(nomor, nama, wbp);
-      }
-
-      // Panggilan manual (tombol ulangi): 1 siklus
+      // Panggilan otomatis (waktu habis) dan tombol ulangi: cukup satu siklus
       async function panggilSekali(nomor, nama, wbp) {
         await satuSiklus(nomor, nama, wbp);
       }
 
-      // ====================== QUEUE ======================
+      // ====================== QUEUE (ANTRIAN PANGGILAN) ======================
       async function processQueue() {
         if (isProcessingQueue) return;
         isProcessingQueue = true;
         while (callQueue.length > 0) {
           const task = callQueue.shift();
           try { await task(); } catch (err) { console.error(err); }
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 500)); // jeda antar antrian
         }
         isProcessingQueue = false;
       }
@@ -308,7 +302,7 @@
       let renderRequestId = null;
       async function renderTabel() {
         if (!isOffsetReady) {
-          document.getElementById("tabelData").innerHTML = '<td><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
+          document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
           return;
         }
         const tbody = document.getElementById("tabelData");
@@ -325,7 +319,7 @@
               item.sudahDipanggil = true;
             } catch (err) { console.error(err); }
             panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
-            addToQueue(panggilDuaKali, nomorAntrian, item.nama, item.wbp);
+            addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           tbody.innerHTML += `
@@ -384,7 +378,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound 1x → jeda 3dt → suara (2x otomatis)";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound sekali → jeda 3dt → suara | Antrean tidak tabrakan";
         renderTabel();
       };
     </script>
