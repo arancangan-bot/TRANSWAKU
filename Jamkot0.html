@@ -215,7 +215,7 @@
       let daftarData = [];
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      let backsoundPlayedMap = {}; // untuk mencegah backsound double dalam satu sesi
+      let isCallingInProgress = new Map();
       
       let serverTimeOffset = 0;
       let isOffsetReady = false;
@@ -309,12 +309,25 @@
         speechSynthesis.speak(speech);
       }
 
-      function putarBacksound(id) {
-        if (backsoundPlayedMap[id]) return;
-        backsoundPlayedMap[id] = true;
+      function putarBacksound() {
         const audio = new Audio("backsound.mpeg");
         audio.play().catch(e => console.warn("Gagal putar backsound:", e));
-        console.log("🔊 Backsound diputar untuk antrian", id);
+        console.log("🔊 Backsound diputar");
+      }
+
+      // Panggilan otomatis: 2 kali
+      async function panggilDuaKali(nomor, nama, wbp) {
+        putarBacksound();
+        await playSuara(nomor, nama, wbp);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        putarBacksound();
+        await playSuara(nomor, nama, wbp);
+      }
+
+      // Panggilan manual (tombol ulang): cukup sekali
+      async function panggilSekali(nomor, nama, wbp) {
+        putarBacksound();
+        await playSuara(nomor, nama, wbp);
       }
 
       // ====================== STATUS TIMER ======================
@@ -360,7 +373,6 @@
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         
-        // Urutkan berdasarkan nomor DESCENDING (besar ke kecil)
         const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
         
         for (const item of sortedData) {
@@ -370,23 +382,27 @@
             nomorAntrian = "—";
           }
           
-          // Jika waktu habis dan belum pernah dipanggil
-          if (status.selesai && !item.sudahDipanggil) {
-            // Putar backsound DULUAN (tepat saat habis)
-            putarBacksound(item.id);
-            
-            // Tandai sudah dipanggil di Firestore
-            await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
-            item.sudahDipanggil = true;
+          if (status.selesai && !item.sudahDipanggil && !isCallingInProgress.get(item.id)) {
+            isCallingInProgress.set(item.id, true);
             
             panggilanTerakhir = {
               nomor: nomorAntrian,
               nama: item.nama,
               wbp: item.wbp,
             };
-            // Kemudian putar suara pemberitahuan
-            playSuara(nomorAntrian, item.nama, item.wbp);
+            
+            try {
+              await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
+              item.sudahDipanggil = true;
+            } catch (err) {
+              console.error("Gagal update sudahDipanggil:", err);
+            }
+            
+            // Panggil 2 kali otomatis
+            panggilDuaKali(nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
+            
+            isCallingInProgress.delete(item.id);
           }
           
           tbody.innerHTML += `
@@ -422,24 +438,29 @@
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
-        delete backsoundPlayedMap[id];
+        isCallingInProgress.delete(id);
       };
 
       window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian?")) return;
+        if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0, antrian berikutnya mulai dari nomor 1")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
-        backsoundPlayedMap = {};
+        // Reset counter
+        const counterRef = doc(db, "counter", "antrianCounter");
+        await setDoc(counterRef, { value: 0 });
+        isCallingInProgress.clear();
+        tampilNotif("🗑️ SEMUA DATA TERHAPUS & COUNTER DI RESET", "Antrian berikutnya mulai nomor 1", "#1e466e");
       };
 
+      // Tombol ulangi: hanya SEKALI
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
           alert("Belum ada panggilan selesai.");
           return;
         }
-        await playSuara(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+        await panggilSekali(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
       };
 
       window.toggleFullscreen = function () {
@@ -460,7 +481,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound saat habis | Panggilan sekali | Urutan DESC";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound & suara 2x otomatis | Ulang sekali | Reset counter";
         renderTabel();
       };
     </script>
