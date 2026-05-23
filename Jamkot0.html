@@ -240,6 +240,7 @@
         audio.play().catch(e => console.warn("Gagal putar backsound:", e));
         console.log("🔊 Backsound diputar");
       }
+      // Panggilan otomatis: backsound -> suara -> jeda 1 detik -> backsound -> suara
       async function panggilDuaKali(nomor, nama, wbp) {
         putarBacksound();
         await playSuara(nomor, nama, wbp);
@@ -247,12 +248,13 @@
         putarBacksound();
         await playSuara(nomor, nama, wbp);
       }
+      // Panggilan manual (tombol ulang): cukup sekali
       async function panggilSekali(nomor, nama, wbp) {
         putarBacksound();
         await playSuara(nomor, nama, wbp);
       }
 
-      // ====================== QUEUE (ANTRIAN PANGGILAN) ======================
+      // ====================== QUEUE ======================
       async function processQueue() {
         if (isProcessingQueue) return;
         isProcessingQueue = true;
@@ -371,7 +373,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Antrian panggilan (tidak tabrakan) | Backsound duluan | Urutan DESC";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound + suara 2x (dengan jeda) | Antrean tidak tabrakan | Reset counter";
         renderTabel();
       };
     </script>
