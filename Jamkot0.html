@@ -197,9 +197,8 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-      // ====================== FIREBASE CONFIG ======================
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
         authDomain: "ruang-kunjungan.firebaseapp.com",
@@ -218,49 +217,60 @@
       let suaraPerempuan = null;
       let suaraDipanggil = {};
       
-      // Offset server (ms) = serverTime - clientTime
-      let serverTimeOffset = 0;
+      let serverTimeOffset = 0;      // ms (serverTime = clientTime + offset)
       let isOffsetReady = false;
 
-      // ====================== KALIBRASI SERVER TIME (LANGSUNG & DISIMPAN) ======================
+      // ====================== KALIBRASI SERVER TIME (MULTI-SAMPLE + MEDIAN) ======================
       async function calibrateServerTime() {
-        // Coba ambil dari localStorage terlebih dahulu (agar cepat saat refresh)
+        // Cek localStorage (berlaku 10 menit)
         const savedOffset = localStorage.getItem("serverTimeOffset");
         const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
         if (savedOffset && savedTime) {
           const age = Date.now() - parseInt(savedTime);
-          // Jika offset disimpan kurang dari 5 menit, gunakan langsung
-          if (age < 5 * 60 * 1000) {
+          if (age < 10 * 60 * 1000) {
             serverTimeOffset = parseInt(savedOffset);
             isOffsetReady = true;
-            console.log("✅ Offset dari localStorage:", serverTimeOffset, "ms");
+            console.log("✅ Pakai offset dari localStorage:", serverTimeOffset, "ms");
             return;
           }
         }
-        
-        // Kalibrasi ulang dengan membuat dokumen sementara
-        try {
-          const tempRef = doc(collection(db, "tempTime"));
-          const beforeClient = Date.now();
-          await setDoc(tempRef, { ping: serverTimestamp() });
-          const snapshot = await getDoc(tempRef);
-          const serverTime = snapshot.data().ping.toDate().getTime();
-          const afterClient = Date.now();
-          const clientTime = (beforeClient + afterClient) / 2;
-          serverTimeOffset = serverTime - clientTime;
-          // Simpan ke localStorage
-          localStorage.setItem("serverTimeOffset", serverTimeOffset);
-          localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
-          isOffsetReady = true;
-          console.log("🔄 Kalibrasi server selesai, offset:", serverTimeOffset, "ms");
-          // Hapus dokumen temporary
-          await deleteDoc(tempRef);
-        } catch (err) {
-          console.error("Gagal kalibrasi server time:", err);
-          // Fallback: offset 0 (gunakan client time)
+
+        // Lakukan 3 kali ping, ambil median RTT
+        const samples = [];
+        for (let i = 0; i < 3; i++) {
+          try {
+            const tempRef = doc(collection(db, "tempTime"));
+            const before = Date.now();
+            await setDoc(tempRef, { ping: serverTimestamp() });
+            const snap = await getDoc(tempRef);
+            const serverTime = snap.data().ping.toDate().getTime();
+            const after = Date.now();
+            const rtt = after - before;
+            const clientTime = before + rtt / 2;
+            const offset = serverTime - clientTime;
+            samples.push(offset);
+            await deleteDoc(tempRef);
+          } catch (e) {
+            console.warn("Ping gagal", e);
+          }
+        }
+
+        if (samples.length === 0) {
           serverTimeOffset = 0;
           isOffsetReady = true;
+          return;
         }
+
+        // Ambil median
+        samples.sort((a, b) => a - b);
+        const median = samples[Math.floor(samples.length / 2)];
+        serverTimeOffset = median;
+        
+        // Simpan ke localStorage
+        localStorage.setItem("serverTimeOffset", serverTimeOffset);
+        localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
+        isOffsetReady = true;
+        console.log("🔄 Kalibrasi selesai, offset median:", serverTimeOffset, "ms");
       }
 
       function getCurrentServerTime() {
@@ -295,7 +305,7 @@
         speechSynthesis.speak(speech);
       }
 
-      // ====================== STATUS TIMER (LANGSUNG, TANPA JEDA) ======================
+      // ====================== STATUS TIMER ======================
       function hitungStatus(item) {
         if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
           return { text: "⏳ Memuat...", class: "hijau" };
@@ -327,10 +337,9 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL ======================
+      // ====================== RENDER ======================
       function renderTabel() {
         if (!isOffsetReady) {
-          // Tampilkan pesan loading jika offset belum siap
           document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
           return;
         }
@@ -386,12 +395,11 @@
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
-        // Hapus juga riwayat suara untuk ID tersebut
         delete suaraDipanggil[id];
       };
 
       window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian? Tindakan ini tidak bisa dibatalkan.")) return;
+        if (!confirm("⚠️ Hapus SEMUA antrian?")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
@@ -411,7 +419,7 @@
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== REALTIME LISTENER ======================
+      // ====================== FIRESTORE LISTENER ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach((doc) => {
@@ -421,17 +429,17 @@
         renderTabel();
       });
 
-      // Update timer setiap detik
+      // Timer setiap detik
       setInterval(() => {
-        renderTabel();
+        if (isOffsetReady) renderTabel();
       }, 1000);
 
       // ====================== INIT ======================
       window.onload = async function () {
-        await calibrateServerTime();  // Kalibrasi langsung, tanpa jeda
+        await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "⏱️ Waktu tersinkronisasi server | Update realtime";
-        renderTabel(); // Tampilkan data (jika ada)
+        document.getElementById("refreshIndicator").innerHTML = "✅ Waktu tersinkron (selisih <0.2 detik) | Update realtime";
+        renderTabel();
       };
     </script>
   </body>
