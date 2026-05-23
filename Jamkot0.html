@@ -270,9 +270,8 @@
         return `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama} berkunjung untuk saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
       }
 
-      // Memutar backsound lalu speech (tanpa hentikan suara sebelumnya, karena kita pakai queue)
-      // Fungsi ini akan dipanggil oleh proses queue
-      async function playSuaraDenganBacksound(nomor, nama, wbp, id) {
+      // Memutar backsound lalu speech
+      async function playSuaraDenganBacksound(nomor, nama, wbp) {
         return new Promise(async (resolve, reject) => {
           // Putar backsound
           const audio = new Audio("backsound.mpeg");
@@ -322,7 +321,7 @@
         });
       }
 
-      // Proses antrian suara
+      // Proses antrian suara (satu per satu)
       async function prosesAntrianSuara() {
         if (sedangMemutar) return;
         if (antrianSuara.length === 0) return;
@@ -331,10 +330,10 @@
         const item = antrianSuara.shift();
         
         try {
-          await playSuaraDenganBacksound(item.nomor, item.nama, item.wbp, item.id);
-          // Setelah selesai, tandai di Firebase bahwa sudah called (jika belum)
+          await playSuaraDenganBacksound(item.nomor, item.nama, item.wbp);
+          // Setelah selesai, tandai di Firebase bahwa sudah called (jika dokumen masih ada)
           const docRef = doc(db, "antrian", item.id);
-          await updateDoc(docRef, { called: true });
+          await updateDoc(docRef, { called: true }).catch(() => {});
         } catch (err) {
           console.error("Error memutar suara:", err);
         } finally {
@@ -343,10 +342,18 @@
         }
       }
       
-      // Tambahkan ke antrian suara
+      // Tambahkan ke antrian suara (urutkan ulang berdasarkan nomor sebelum diproses)
       function tambahAntrianSuara(nomor, nama, wbp, id) {
+        // Tambahkan ke antrian
         antrianSuara.push({ nomor, nama, wbp, id });
+        // Urutkan antrian berdasarkan nomor (ascending) agar sesuai urutan antrian
+        antrianSuara.sort((a, b) => a.nomor - b.nomor);
         prosesAntrianSuara();
+      }
+      
+      // Hapus data dari antrian suara jika ada (misal data dihapus sebelum dipanggil)
+      function hapusDariAntrianSuara(id) {
+        antrianSuara = antrianSuara.filter(item => item.id !== id);
       }
 
       // ======================
@@ -405,7 +412,7 @@
               wbp: item.wbp,
               id: item.id
             };
-            // Tambahkan ke antrian suara (tidak langsung diputar, tapi masuk queue)
+            // Tambahkan ke antrian suara (otomatis diurutkan berdasarkan nomor)
             tambahAntrianSuara(nomorAntrian, item.nama, item.wbp, item.id);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
@@ -439,26 +446,32 @@
       }
 
       // ======================
-      // HAPUS DATA
+      // HAPUS DATA (SATU)
       // ======================
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
+        // Hapus dari antrian suara jika sedang antri
+        hapusDariAntrianSuara(id);
         await deleteDoc(doc(db, "antrian", id));
-        // Jika data yang dihapus sedang dalam antrian suara, tidak masalah karena queue akan tetap jalan
       };
 
+      // ======================
+      // HAPUS SEMUA DATA
+      // ======================
       window.hapusSemuaData = async function () {
-        if (!confirm("Hapus semua antrian?")) return;
+        if (!confirm("Hapus semua antrian? PERINGATAN: Semua data akan hilang dan antrian suara dibatalkan.")) return;
+        // Hentikan semua suara yang sedang berjalan
+        hentikanSemuaSuara();
+        // Kosongkan antrian suara
+        antrianSuara = [];
+        sedangMemutar = false;
+        // Hapus semua dokumen dari Firebase
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach((d) => {
           promises.push(deleteDoc(doc(db, "antrian", d.id)));
         });
         await Promise.all(promises);
-        // Kosongkan antrian suara karena semua data hilang
-        antrianSuara = [];
-        hentikanSemuaSuara();
-        sedangMemutar = false;
       };
 
       // ======================
@@ -469,15 +482,9 @@
           alert("Belum ada panggilan.");
           return;
         }
-        // Untuk tombol ulang, kita panggil langsung tanpa menandai called (karena manual)
-        // Tapi kita masukkan ke antrian juga agar tidak potong suara yang sedang berjalan
-        antrianSuara.push({
-          nomor: panggilanTerakhir.nomor,
-          nama: panggilanTerakhir.nama,
-          wbp: panggilanTerakhir.wbp,
-          id: panggilanTerakhir.id + "_ulang" // id unik agar tidak bentrok
-        });
-        prosesAntrianSuara();
+        // Untuk tombol ulang, kita masukkan ke antrian juga agar tidak memotong suara yang sedang berjalan
+        // dan tetap mengikuti urutan antrian (nomor urut terakhir panggilan)
+        tambahAntrianSuara(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp, panggilanTerakhir.id + "_ulang");
       };
 
       // ======================
@@ -497,7 +504,7 @@
           daftarData.push({
             id: doc.id,
             ...data,
-            called: data.called || false   // pastikan ada field called
+            called: data.called || false
           });
         });
         renderTabel();
