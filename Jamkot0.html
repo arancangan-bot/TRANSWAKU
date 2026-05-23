@@ -180,7 +180,7 @@
         <table>
           <thead>
             <tr>
-              <th>No</th>
+              <th>No. Antrian</th>
               <th>Nama Pengunjung</th>
               <th>Nama WBP</th>
               <th>Status / Waktu</th>
@@ -354,53 +354,46 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER DENGAN NOMOR URUT TERBALIK ======================
+      // ====================== RENDER (URUTAN DESCENDING NOMOR) ======================
       let renderRequestId = null;
       function renderTabel() {
         if (!isOffsetReady) {
-          document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
+          document.getElementById("tabelData").innerHTML = '<td><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
           return;
         }
         
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         
-        // Urutkan dari yang PALING LAMA ke PALING BARU (ascending createdAt)
-        const sortedData = [...daftarData].sort((a, b) => {
-          let timeA = a.createdAt?.toDate?.()?.getTime() || 0;
-          let timeB = b.createdAt?.toDate?.()?.getTime() || 0;
-          return timeA - timeB;
-        });
+        // Urutkan berdasarkan nomor antrian DESCENDING (besar di atas, kecil di bawah)
+        const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
         
-        const total = sortedData.length;
-        // Looping dari data terbaru (index tertinggi) ke terlama, agar baris terbawah mendapat nomor 1
-        for (let i = total - 1; i >= 0; i--) {
-          const item = sortedData[i];
-          const nomorUrut = total - i; // baris paling bawah = 1, ke atas bertambah
+        sortedData.forEach((item) => {
           const status = hitungStatus(item);
+          const nomorAntrian = item.nomor || 0;
           
-          // Panggil suara jika selesai (periksa apakah sudah dipanggil)
+          // Panggil suara jika selesai
           if (status.selesai && !suaraDipanggil[item.id]) {
             suaraDipanggil[item.id] = true;
             panggilanTerakhir = {
-              nomor: nomorUrut,
+              nomor: nomorAntrian,
               nama: item.nama,
               wbp: item.wbp,
             };
-            playSuara(nomorUrut, item.nama, item.wbp);
+            playSuara(nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           
           tbody.innerHTML += `
             <tr>
-              <td>${nomorUrut}</td>
+              <td>${nomorAntrian}</td>
               <td>${escapeHtml(item.nama)}</td>
               <td>${escapeHtml(item.wbp)}</td>
               <td><span class="${status.class}">${status.text}</span></td>
               <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
             </tr>
           `;
-        }
+        });
         
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
         renderRequestId = requestAnimationFrame(() => {
@@ -464,7 +457,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "⚡ Antrian terbaru di bawah (No. 1) | Backsound 3 detik sebelum habis";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Nomor antrian tetap & urutan DESC (nomor 1 di bawah)";
         renderTabel();
       };
     </script>
