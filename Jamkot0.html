@@ -177,7 +177,7 @@
         <button class="btn-fullscreen" onclick="toggleFullscreen()">🖥️ Full Layar</button>
       </div>
       <div class="table-wrapper">
-         <table>
+        <table>
           <thead>
             <tr>
               <th>No</th>
@@ -188,7 +188,7 @@
             </tr>
           </thead>
           <tbody id="tabelData"></tbody>
-         </table>
+        </table>
       </div>
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
@@ -209,7 +209,6 @@
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
-      // ====================== INIT FIREBASE ======================
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
@@ -218,6 +217,56 @@
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
       let suaraDipanggil = {};
+      
+      // Offset waktu server (milidetik) = waktu server - waktu lokal
+      // Dengan rumus: serverNow = Date.now() + serverTimeOffset
+      let serverTimeOffset = 0; 
+      let isOffsetCalibrated = false;
+
+      // ====================== KALIBRASI OFFSET SERVER ======================
+      // Fungsi ini dipanggil setiap snapshot untuk menghitung offset berdasarkan data pertama yang memiliki createdAt
+      function calibrateServerOffset(snapshotData) {
+        if (isOffsetCalibrated) return;
+        // Cari data pertama yang memiliki createdAt (timestamp server)
+        const itemWithServerTime = snapshotData.find(item => item.createdAt && typeof item.createdAt.toDate === 'function');
+        if (!itemWithServerTime) return;
+        
+        const serverCreated = itemWithServerTime.createdAt.toDate().getTime();
+        const clientNow = Date.now();
+        // Karena data sudah diterima, asumsikan waktu server saat creation diketahui.
+        // Kita hitung offset: serverTime = clientTime - offset? Mari kita tentukan offset = clientNow - serverCreated
+        // Maka serverNow = clientNow - offset. Namun perlu diingat bahwa data dibuat di masa lalu.
+        // Yang kita butuh: elapsed = (serverCurrentTime - serverCreated). 
+        // serverCurrentTime tidak kita ketahui, tapi kita bisa hitung offset dari client.
+        // Lebih baik: kita catat selisih antara client time dan server time pada saat snapshot.
+        // Karena snapshot diterima segera, kita asumsikan clientNow = serverNow + (client-server diff).
+        // Maka serverNow = clientNow - diff. Diff = clientNow - serverCreated - (elapsed sejak creation sampai snapshot)
+        // Namun elapsed kecil (ms), abaikan. Pendekatan praktis: gunakan serverCreated sebagai anchor.
+        // Kita hitung diff = clientNow - serverCreated. Maka perkiraan serverNow = clientNow - diff.
+        // Tapi diff akan besar karena data dibuat di masa lalu. 
+        // Solusi: kita ambil snapshot timestamp dari metadata? Tidak ada. Alternatif: ambil data terbaru?
+        // Pendekatan yang lebih stabil: saat menerima snapshot, kita catat clientTimeSnapshot dan ambil createdAt dari dokumen TERBARU (waktu paling besar).
+        // Karena itu akan mendekati waktu server saat snapshot.
+        let latestServerTime = 0;
+        for (let item of snapshotData) {
+          if (item.createdAt && typeof item.createdAt.toDate === 'function') {
+            const t = item.createdAt.toDate().getTime();
+            if (t > latestServerTime) latestServerTime = t;
+          }
+        }
+        if (latestServerTime === 0) return;
+        const clientTimeSnapshot = Date.now();
+        // Asumsikan server time saat snapshot = latestServerTime (data terbaru dibuat sesaat sebelum snapshot)
+        // Maka offset = clientTimeSnapshot - latestServerTime (positif jika client lebih cepat)
+        serverTimeOffset = clientTimeSnapshot - latestServerTime;
+        isOffsetCalibrated = true;
+        console.log(`Offset server terkalibrasi: ${serverTimeOffset} ms (client ${serverTimeOffset > 0 ? 'lebih cepat' : 'lebih lambat'} dari server)`);
+      }
+
+      // Mendapatkan waktu server saat ini (dalam milidetik)
+      function getCurrentServerTime() {
+        return Date.now() - serverTimeOffset;
+      }
 
       // ====================== SUARA ======================
       async function getSuaraPerempuan() {
@@ -238,11 +287,7 @@
       }
 
       async function playSuara(nomor, nama, wbp) {
-        const teks = `Nomor antrian ${nomor},
-    ${nama} untuk ${wbp},
-    waktu kunjungan telah habis.
-    Silakan meninggalkan ruangan kunjungan.
-    Terima kasih.`;
+        const teks = `Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
         speech.rate = 0.92;
@@ -251,62 +296,55 @@
         speechSynthesis.speak(speech);
       }
 
-      // ====================== STATUS TIMER (5 MENIT KUNJUNGAN) ======================
+      // ====================== STATUS TIMER (berbasis server time) ======================
       function hitungStatus(item) {
-        // Jika createdAt tidak valid, gunakan waktu sekarang agar tidak error
-        let createdTime = Date.now();
-        if (item.createdAt && typeof item.createdAt.toDate === 'function') {
-          createdTime = item.createdAt.toDate().getTime();
-        } else if (item.createdAt && item.createdAt.seconds) {
-          createdTime = item.createdAt.seconds * 1000;
+        if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
+          return { text: "⏳ Memuat...", class: "hijau" };
         }
+        const serverCreated = item.createdAt.toDate().getTime();
+        const serverNow = getCurrentServerTime();
+        let elapsed = Math.floor((serverNow - serverCreated) / 1000);
+        if (elapsed < 0) elapsed = 0;
         
-        const elapsed = Math.floor((Date.now() - createdTime) /1000);
-        const persiapan = item.durasiPersiapan || 10;        // 10 detik persiapan
-        const kunjungan = item.durasiKunjungan || 300;      // 5 MENIT = 300 detik
+        const persiapan = item.durasiPersiapan || 10;
+        const kunjungan = item.durasiKunjungan || 300;
         
-        // Tahap PERSIAPAN (10 detik)
+        // Tahap PERSIAPAN
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-          return { text: `⏳ PERSIAPAN (${10}s)`, class: "hijau" };
+          return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau" };
         }
         
-        // Tahap KUNJUNGAN (5 menit countdown)
+        // Tahap KUNJUNGAN
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = sisa % 60;
-          // Tampilkan menit:detik dengan format MM:SS
           return { 
             text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`, 
             class: sisa <= 10 ? "merah" : "" 
           };
         }
         
-        // Selesai
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL (dengan sorting berdasarkan waktu) ======================
+      // ====================== RENDER TABEL ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         
-        // Urutkan antrian dari yang paling lama (FIFO)
+        // Urutkan berdasarkan server createdAt (FIFO)
         const sortedData = [...daftarData].sort((a, b) => {
-          let timeA = 0, timeB = 0;
-          if (a.createdAt && a.createdAt.toDate) timeA = a.createdAt.toDate().getTime();
-          else if (a.createdAt && a.createdAt.seconds) timeA = a.createdAt.seconds * 1000;
-          if (b.createdAt && b.createdAt.toDate) timeB = b.createdAt.toDate().getTime();
-          else if (b.createdAt && b.createdAt.seconds) timeB = b.createdAt.seconds * 1000;
+          let timeA = a.createdAt?.toDate?.()?.getTime() || 0;
+          let timeB = b.createdAt?.toDate?.()?.getTime() || 0;
           return timeA - timeB;
         });
         
         sortedData.forEach((item, index) => {
           const status = hitungStatus(item);
           
-          // Panggil suara otomatis jika baru saja selesai (selesai && belum dipanggil)
           if (status.selesai && !suaraDipanggil[item.id]) {
             suaraDipanggil[item.id] = true;
             panggilanTerakhir = {
@@ -342,7 +380,7 @@
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
-      // ====================== HAPUS SATU & SEMUA ======================
+      // ====================== HAPUS ======================
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
@@ -354,10 +392,9 @@
         const promises = [];
         snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
-        suaraDipanggil = {}; // reset riwayat panggilan suara
+        suaraDipanggil = {};
       };
 
-      // ====================== ULANGI PANGGILAN TERAKHIR ======================
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
           alert("Belum ada panggilan selesai.");
@@ -366,30 +403,35 @@
         await playSuara(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
       };
 
-      // ====================== FULLSCREEN ======================
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== REALTIME LISTENER (dengan update urutan) ======================
+      // ====================== REALTIME LISTENER ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
-        daftarData = [];
+        const newData = [];
         snapshot.forEach((doc) => {
-          daftarData.push({ id: doc.id, ...doc.data() });
+          newData.push({ id: doc.id, ...doc.data() });
         });
+        daftarData = newData;
+        
+        // Kalibrasi offset server berdasarkan data yang ada (hanya sekali)
+        if (!isOffsetCalibrated && daftarData.length > 0) {
+          calibrateServerOffset(daftarData);
+        }
+        
         renderTabel();
       });
 
-      // Update timer setiap detik (agar countdown berjalan mulus)
+      // Update timer setiap detik
       setInterval(() => {
-        renderTabel();
+        if (isOffsetCalibrated) renderTabel();
       }, 1000);
 
-      // ====================== INIT SUARA ======================
+      // ====================== INIT ======================
       window.onload = async function () {
         await getSuaraPerempuan();
-        // Tampilkan info refresh otomatis
-        document.getElementById("refreshIndicator").innerText = "⏱️ Update realtime + countdown setiap detik";
+        document.getElementById("refreshIndicator").innerText = "⏱️ Sinkronisasi waktu server | Update realtime";
       };
     </script>
   </body>
