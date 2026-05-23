@@ -225,12 +225,12 @@
       let suaraPerempuan = null;
       let suaraDipanggil = {};
       
-      // Untuk mengatur audio & speech agar tidak tumpang tindih
+      // Pengelola audio & speech agar tidak tumpuk
       let currentAudio = null;
       let currentSpeech = null;
 
       // ======================
-      // SUARA (Text-to-Speech)
+      // AMBIL SUARA PEREMPUAN (TTS)
       // ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
@@ -249,7 +249,7 @@
         });
       }
 
-      // Fungsi untuk menghentikan semua suara & audio yang sedang berjalan
+      // Hentikan semua suara (audio + speech) yang sedang berjalan
       function hentikanSemuaSuara() {
         if (currentAudio) {
           currentAudio.pause();
@@ -262,31 +262,33 @@
         }
       }
 
-      // Membuat teks panggilan (tanpa "Mohon Perhatian" karena sudah dipisah dengan backsound)
+      // Teks panggilan (diawali "Mohon Perhatian")
       function buatTeksPanggilan(nomor, nama, wbp) {
         return `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama} berkunjung untuk saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
       }
 
-      // Memutar backsound lalu dilanjutkan dengan speech
+      // ======================
+      // FUNGSI UTAMA: BACKSOUND DULU, LALU SPEECH
+      // ======================
       async function playSuaraDenganBacksound(nomor, nama, wbp) {
-        // Hentikan suara/audio sebelumnya agar tidak bentrok
+        // Matikan suara sebelumnya
         hentikanSemuaSuara();
         
-        // Siapkan audio backsound
+        // Putar backsound.mpeg terlebih dahulu
         const audio = new Audio("backsound.mpeg");
         currentAudio = audio;
         
-        // Jika gagal load atau error, tetap lanjut ke speech
+        // Jika gagal load / error, tetap lanjut speech (tanpa backsound)
         audio.onerror = () => {
-          console.warn("Gagal memuat backsound.mpeg, lanjut ke speech tanpa backsound.");
+          console.warn("Gagal memuat atau memutar backsound.mpeg, langsung lanjut ke speech.");
           currentAudio = null;
-          lanjutkanSpeech(nomor, nama, wbp);
+          jalankanSpeech(nomor, nama, wbp);
         };
         
-        // Ketika audio selesai diputar, baru jalankan speech
+        // Ketika backsound selesai, baru jalankan speech
         audio.onended = () => {
           currentAudio = null;
-          lanjutkanSpeech(nomor, nama, wbp);
+          jalankanSpeech(nomor, nama, wbp);
         };
         
         // Mulai putar backsound
@@ -294,13 +296,12 @@
           await audio.play();
         } catch (err) {
           console.warn("Autoplay backsound diblokir atau error:", err);
-          // Jika gagal, langsung speech tanpa backsound
           currentAudio = null;
-          lanjutkanSpeech(nomor, nama, wbp);
+          jalankanSpeech(nomor, nama, wbp);
         }
       }
       
-      async function lanjutkanSpeech(nomor, nama, wbp) {
+      async function jalankanSpeech(nomor, nama, wbp) {
         const teks = buatTeksPanggilan(nomor, nama, wbp);
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
@@ -309,20 +310,14 @@
         speech.voice = await getSuaraPerempuan();
         
         currentSpeech = speech;
-        
-        // Bersihkan referensi setelah selesai
-        speech.onend = () => {
-          currentSpeech = null;
-        };
-        speech.onerror = () => {
-          currentSpeech = null;
-        };
+        speech.onend = () => { currentSpeech = null; };
+        speech.onerror = () => { currentSpeech = null; };
         
         speechSynthesis.speak(speech);
       }
 
       // ======================
-      // STATUS TIMER (diperbaiki tampilan waktu)
+      // STATUS TIMER (HITUNG WAKTU)
       // ======================
       function hitungStatus(item) {
         if (!item.createdAt) {
@@ -334,13 +329,11 @@
         const persiapan = item.durasiPersiapan || 10;
         const kunjungan = item.durasiKunjungan || 60;
 
-        // Persiapan
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau" };
         }
 
-        // Kunjungan berjalan
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
@@ -349,12 +342,11 @@
           return { text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`, class: sisa <= 10 ? "merah" : "" };
         }
 
-        // Selesai
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
       // ======================
-      // RENDER TABEL
+      // RENDER TABEL + PANGGIL OTOMATIS SAAT SELESAI
       // ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
@@ -363,7 +355,7 @@
         daftarData.forEach((item, index) => {
           const status = hitungStatus(item);
           
-          // Panggil suara otomatis jika status SELESAI dan belum pernah dipanggil
+          // Jika status selesai dan belum pernah dipanggil, panggil dengan backsound dulu
           if (status.selesai && !suaraDipanggil[item.id]) {
             suaraDipanggil[item.id] = true;
             panggilanTerakhir = {
@@ -371,7 +363,7 @@
               nama: item.nama,
               wbp: item.wbp,
             };
-            // Gunakan fungsi dengan backsound
+            // Urutan: backsound habis → speech "Mohon Perhatian..."
             playSuaraDenganBacksound(index + 1, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
@@ -410,7 +402,6 @@
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
-        // Hapus status panggilan untuk id tersebut dari memori
         delete suaraDipanggil[id];
       };
 
@@ -426,7 +417,7 @@
       };
 
       // ======================
-      // ULANGI PANGGILAN TERAKHIR (dengan backsound juga)
+      // ULANGI PANGGILAN TERAKHIR (juga dengan backsound dulu)
       // ======================
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
@@ -455,20 +446,20 @@
       });
 
       // ======================
-      // AUTO RENDER SETIAP DETIK (update timer)
+      // UPDATE TIMER SETIAP DETIK
       // ======================
       setInterval(() => {
         renderTabel();
       }, 1000);
 
       // ======================
-      // INIT
+      // INIT (PRELOAD BACKSOUND)
       // ======================
       window.onload = async function () {
         await getSuaraPerempuan();
-        // Opsional: preload backsound (agar lebih cepat saat pertama dipanggil)
-        const preloadAudio = new Audio("backsound.mpeg");
-        preloadAudio.load();
+        // Preload backsound agar lebih cepat saat pertama kali dipanggil
+        const preload = new Audio("backsound.mpeg");
+        preload.load();
       };
     </script>
   </body>
