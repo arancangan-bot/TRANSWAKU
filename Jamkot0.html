@@ -158,6 +158,16 @@
           font-size: 0.8rem;
         }
       }
+      .group-header {
+        background-color: #f1f5f9;
+        font-weight: bold;
+        text-align: center;
+        font-size: 0.9rem;
+      }
+      .group-header td {
+        background-color: #e2e8f0;
+        padding: 8px;
+      }
     </style>
   </head>
   <body>
@@ -180,7 +190,7 @@
         <table>
           <thead>
             <tr>
-              <th>No</th>
+              <th>No. Antrian</th>
               <th>Nama Pengunjung</th>
               <th>Nama WBP</th>
               <th>Status / Waktu</th>
@@ -211,20 +221,19 @@
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
-      // INIT FIREBASE
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
       // ======================
       // GLOBAL STATE
       // ======================
-      let daftarData = [];          // akan diurutkan DESC (terbaru di atas, terlama di bawah)
+      let daftarData = [];          // semua data dari firestore
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      let suaraDipanggil = new Map(); // key: id dokumen, value: true jika sudah diumumkan selesai
+      let suaraDipanggil = new Map(); // id -> true jika sudah diumumkan selesai
       
-      // ANTRIAN PEMBERITAHUAN (untuk menghindari tumpukan suara)
-      let antrianPanggilan = [];     // array of { id, nomor, nama, wbp }
+      // Antrian panggilan suara
+      let antrianPanggilan = [];
       let sedangMemprosesAntrian = false;
       
       // Audio backsound
@@ -236,13 +245,11 @@
       function initBacksound() {
         backsoundAudio = new Audio("backsound.mpeg");
         backsoundAudio.preload = "auto";
-        backsoundAudio.onerror = () => {
-          console.warn("File backsound.mpeg tidak ditemukan, melanjutkan tanpa backsound.");
-        };
+        backsoundAudio.onerror = () => console.warn("File backsound.mpeg tidak ditemukan.");
       }
       
       // ======================
-      // SUARA TEXT-TO-SPEECH
+      // SUARA TTS
       // ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
@@ -276,10 +283,9 @@
       
       async function playSatuSiklus(nomor, nama, wbp) {
         const teks = `Mohon Perhatian. Nomor antrian ${nomor}, ${nama} untuk ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
-        
         if (backsoundAudio) {
           backsoundAudio.currentTime = 0;
-          await backsoundAudio.play().catch(e => console.warn("Backsound gagal diputar:", e));
+          await backsoundAudio.play().catch(e => console.warn("Backsound gagal:", e));
         }
         await speakTeks(teks);
       }
@@ -290,14 +296,12 @@
       }
       
       // ======================
-      // PROSES ANTRIAN PEMBERITAHUAN
+      // PROSES ANTRIAN PANGGILAN (urutan nomor kecil ke besar)
       // ======================
       async function prosesAntrianPanggilan() {
         if (sedangMemprosesAntrian) return;
         if (antrianPanggilan.length === 0) return;
-        
         sedangMemprosesAntrian = true;
-        
         while (antrianPanggilan.length > 0) {
           const item = antrianPanggilan.shift();
           panggilanTerakhir = {
@@ -307,17 +311,14 @@
           };
           tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp} (No. ${item.nomor})`, "#dc2626");
           await playSuaraDenganUlang(item.nomor, item.nama, item.wbp);
-          await new Promise(r => setTimeout(r, 800));
+          await new Promise(r => setTimeout(r, 600));
         }
-        
         sedangMemprosesAntrian = false;
       }
       
       function tambahKeAntrianPanggilan(id, nomor, nama, wbp) {
-        const sudahAda = antrianPanggilan.some(item => item.id === id);
-        if (sudahAda) return;
+        if (antrianPanggilan.some(item => item.id === id)) return;
         antrianPanggilan.push({ id, nomor, nama, wbp });
-        // Urutkan berdasarkan nomor (kecil ke besar) agar antrian lama (nomor kecil) dipanggil lebih dulu
         antrianPanggilan.sort((a, b) => a.nomor - b.nomor);
         prosesAntrianPanggilan();
       }
@@ -339,7 +340,6 @@
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau", selesai: false };
         }
-        
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
@@ -351,53 +351,90 @@
             selesai: false
           };
         }
-        
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
       
       // ======================
-      // RENDER TABEL (Urutan: terbaru di atas, terlama di bawah)
+      // RENDER TABEL DENGAN PISAHAN: BELUM SELESAI (ATAS) - SUDAH SELESAI (BAWAH)
+      // NOMOR ANTIAN TETAP BERDASARKAN URUTAN CREATEDAT ASC (NOMOR GLOBAL)
       // ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
         if (!tbody) return;
         
-        // Urutkan DESC: data terbaru (createdAt paling besar) di atas, terlama di bawah
-        const dataUrut = [...daftarData].sort((a, b) => {
+        // Urutkan semua data berdasarkan createdAt ASC untuk menentukan nomor antrian tetap
+        const sortedAll = [...daftarData].sort((a, b) => {
           if (!a.createdAt) return 1;
           if (!b.createdAt) return -1;
-          return b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime();
+          return a.createdAt.toDate().getTime() - b.createdAt.toDate().getTime();
         });
         
-        tbody.innerHTML = "";
-        if (dataUrut.length === 0) {
-          tbody.innerHTML = `<tr class="empty-row"><td colspan="5">✨ Tidak ada antrian aktif ✨</td></tr>`;
-          return;
+        // Beri nomor antrian tetap (index + 1) berdasarkan urutan masuk
+        const dataWithFixedNumber = sortedAll.map((item, idx) => ({
+          ...item,
+          nomorTetap: idx + 1
+        }));
+        
+        // Pisahkan berdasarkan status selesai
+        const belumSelesai = [];
+        const sudahSelesai = [];
+        
+        for (const item of dataWithFixedNumber) {
+          const status = hitungStatus(item);
+          if (status.selesai) {
+            sudahSelesai.push({ ...item, statusObj: status });
+          } else {
+            belumSelesai.push({ ...item, statusObj: status });
+          }
         }
         
-        dataUrut.forEach((item, idx) => {
-          const status = hitungStatus(item);
-          const nomorUrut = idx + 1;  // nomor tampilan: 1 untuk antrian terbaru (paling atas)
-          
+        // Urutkan masing-masing kelompok berdasarkan nomorTetap (kecil ke besar)
+        belumSelesai.sort((a, b) => a.nomorTetap - b.nomorTetap);
+        sudahSelesai.sort((a, b) => a.nomorTetap - b.nomorTetap);
+        
+        tbody.innerHTML = "";
+        
+        // Fungsi render baris
+        function renderBaris(item, status) {
           const sudahDipanggil = suaraDipanggil.get(item.id) === true;
           if (status.selesai && !sudahDipanggil) {
             suaraDipanggil.set(item.id, true);
-            tambahKeAntrianPanggilan(item.id, nomorUrut, item.nama, item.wbp);
+            tambahKeAntrianPanggilan(item.id, item.nomorTetap, item.nama, item.wbp);
           }
           
           const namaAman = escapeHtml(item.nama);
           const wbpAman = escapeHtml(item.wbp);
-          
-          tbody.innerHTML += `
+          return `
             <tr>
-              <td>${nomorUrut}</td>
+              <td><strong>${item.nomorTetap}</strong></td>
               <td>${namaAman}</td>
               <td>${wbpAman}</td>
               <td><span class="${status.class}">${status.text}</span></td>
               <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
             </tr>
           `;
-        });
+        }
+        
+        // Bagian ATAS: Belum Selesai
+        if (belumSelesai.length > 0) {
+          // Optional: tambahkan label grup (tidak wajib, tapi memperjelas)
+          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN / PERSIAPAN</td></tr>`;
+          for (const item of belumSelesai) {
+            tbody.innerHTML += renderBaris(item, item.statusObj);
+          }
+        }
+        
+        // Bagian BAWAH: Sudah Selesai
+        if (sudahSelesai.length > 0) {
+          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🔴 ANTRIAN SELESAI (WAKTU HABIS)</td></tr>`;
+          for (const item of sudahSelesai) {
+            tbody.innerHTML += renderBaris(item, item.statusObj);
+          }
+        }
+        
+        if (daftarData.length === 0) {
+          tbody.innerHTML = `<tr class="empty-row"><td colspan="5">✨ Tidak ada antrian aktif ✨</td></tr>`;
+        }
       }
       
       // ======================
@@ -430,9 +467,7 @@
         await resetSemuaState();
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
-        snapshot.forEach((d) => {
-          promises.push(deleteDoc(doc(db, "antrian", d.id)));
-        });
+        snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
         suaraDipanggil.clear();
         tampilNotif("🗑️ Semua Data Dihapus", "Dashboard telah dibersihkan", "#b91c1c");
@@ -476,13 +511,11 @@
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach((docSnap) => {
-          newData.push({
-            id: docSnap.id,
-            ...docSnap.data()
-          });
+          newData.push({ id: docSnap.id, ...docSnap.data() });
         });
         daftarData = newData;
         
+        // Bersihkan suaraDipanggil untuk ID yang sudah tidak ada
         const idsExist = new Set(daftarData.map(d => d.id));
         for (let id of suaraDipanggil.keys()) {
           if (!idsExist.has(id)) suaraDipanggil.delete(id);
@@ -492,9 +525,7 @@
         renderTabel();
       });
       
-      // ======================
-      // UPDATE TIMER PER DETIK
-      // ======================
+      // Update timer tiap detik
       setInterval(() => {
         renderTabel();
       }, 1000);
@@ -505,16 +536,16 @@
       window.onload = async function () {
         initBacksound();
         await getSuaraPerempuan();
-        tampilNotif("🔊 Sistem Siap", "Ketika waktu habis, panggilan suara otomatis dengan backsound.", "#1e466e");
+        tampilNotif("🔊 Sistem Siap", "Antrian selesai akan dipanggil dengan backsound & diulang 2x", "#1e466e");
       };
       
-      // Mengaktifkan audio context saat pertama kali interaksi user
+      // Aktifkan audio context setelah interaksi user pertama
       function enableAudioContext() {
         if (backsoundAudio) {
           backsoundAudio.play().then(() => {
             backsoundAudio.pause();
             backsoundAudio.currentTime = 0;
-          }).catch(e => console.log("Audio context diaktifkan setelah interaksi"));
+          }).catch(e => console.log("Audio context ready"));
         }
         document.removeEventListener("click", enableAudioContext);
         document.removeEventListener("touchstart", enableAudioContext);
