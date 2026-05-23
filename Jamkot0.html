@@ -177,7 +177,7 @@
         <button class="btn-fullscreen" onclick="toggleFullscreen()">🖥️ Full Layar</button>
       </div>
       <div class="table-wrapper">
-        <table>
+         <table>
           <thead>
             <tr>
               <th>No</th>
@@ -188,7 +188,7 @@
             </tr>
           </thead>
           <tbody id="tabelData"></tbody>
-        </table>
+         </table>
       </div>
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
@@ -197,67 +197,40 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-
       import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-      // ======================
-      // FIREBASE CONFIG
-      // ======================
-
+      // ====================== FIREBASE CONFIG ======================
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
-
         authDomain: "ruang-kunjungan.firebaseapp.com",
-
         projectId: "ruang-kunjungan",
-
         storageBucket: "ruang-kunjungan.firebasestorage.app",
-
         messagingSenderId: "1070275298561",
-
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
-      // ======================
-      // INIT FIREBASE
-      // ======================
-
+      // ====================== INIT FIREBASE ======================
       const app = initializeApp(firebaseConfig);
-
       const db = getFirestore(app);
 
-      // ======================
-      // GLOBAL
-      // ======================
-
+      // ====================== GLOBAL ======================
       let daftarData = [];
-
       let panggilanTerakhir = null;
-
       let suaraPerempuan = null;
-
       let suaraDipanggil = {};
 
-      // ======================
-      // SUARA
-      // ======================
-
+      // ====================== SUARA ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if (suaraPerempuan) {
             resolve(suaraPerempuan);
-
             return;
           }
-
           const cek = setInterval(() => {
             const voices = speechSynthesis.getVoices();
-
             if (voices.length) {
               clearInterval(cek);
-
               suaraPerempuan = voices.find((v) => v.lang === "id-ID") || voices[0];
-
               resolve(suaraPerempuan);
             }
           }, 100);
@@ -270,305 +243,153 @@
     waktu kunjungan telah habis.
     Silakan meninggalkan ruangan kunjungan.
     Terima kasih.`;
-
         const speech = new SpeechSynthesisUtterance(teks);
-
         speech.lang = "id-ID";
-
         speech.rate = 0.92;
-
         speech.pitch = 1.1;
-
         speech.voice = await getSuaraPerempuan();
-
         speechSynthesis.speak(speech);
       }
 
-      // ======================
-      // STATUS TIMER
-      // ======================
-
+      // ====================== STATUS TIMER (5 MENIT KUNJUNGAN) ======================
       function hitungStatus(item) {
-        if (!item.createdAt) {
-          return {
-            text: "⏳ Memuat 10",
-            class: "hijau",
-          };
+        // Jika createdAt tidak valid, gunakan waktu sekarang agar tidak error
+        let createdTime = Date.now();
+        if (item.createdAt && typeof item.createdAt.toDate === 'function') {
+          createdTime = item.createdAt.toDate().getTime();
+        } else if (item.createdAt && item.createdAt.seconds) {
+          createdTime = item.createdAt.seconds * 1000;
         }
-
-        const created = item.createdAt.toDate().getTime();
-
-        const sekarang = Date.now();
-
-        const elapsed = Math.floor((sekarang - created) / 1000);
-
-        const persiapan = item.durasiPersiapan;
-
-        const kunjungan = item.durasiKunjungan;
-
-        // ======================
-        // PERSIAPAN
-        // ======================
-
+        
+        const elapsed = Math.floor((Date.now() - createdTime) / 1000);
+        const persiapan = item.durasiPersiapan || 10;        // 10 detik persiapan
+        const kunjungan = item.durasiKunjungan || 300;      // 5 MENIT = 300 detik
+        
+        // Tahap PERSIAPAN (10 detik)
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-
-          return {
-            text: `⏳ PERSIAPAN (${10}s)`,
-
-            class: "hijau",
-          };
+          return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau" };
         }
-
-        // ======================
-        // BERJALAN
-        // ======================
-
+        
+        // Tahap KUNJUNGAN (5 menit countdown)
         const elapsedKunjungan = elapsed - persiapan;
-
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
-
           const menit = Math.floor(sisa / 60);
-
           const detik = sisa % 60;
-
-          return {
-            text: `⏱️ ${5}:${detik.toString().padStart(2, "0")}`,
-
-            class: sisa <= 10 ? "merah" : "",
+          // Tampilkan menit:detik dengan format MM:SS
+          return { 
+            text: `⏱️ ${menit}:${detik.toString().padStart(2, "0")}`, 
+            class: sisa <= 10 ? "merah" : "" 
           };
         }
-
-        // ======================
-        // SELESAI
-        // ======================
-
-        return {
-          text: "✔️ SELESAI",
-
-          class: "merah",
-
-          selesai: true,
-        };
+        
+        // Selesai
+        return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ======================
-      // RENDER
-      // ======================
-
+      // ====================== RENDER TABEL (dengan sorting berdasarkan waktu) ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
-
         tbody.innerHTML = "";
-
-        daftarData.forEach((item, index) => {
+        
+        // Urutkan antrian dari yang paling lama (FIFO)
+        const sortedData = [...daftarData].sort((a, b) => {
+          let timeA = 0, timeB = 0;
+          if (a.createdAt && a.createdAt.toDate) timeA = a.createdAt.toDate().getTime();
+          else if (a.createdAt && a.createdAt.seconds) timeA = a.createdAt.seconds * 1000;
+          if (b.createdAt && b.createdAt.toDate) timeB = b.createdAt.toDate().getTime();
+          else if (b.createdAt && b.createdAt.seconds) timeB = b.createdAt.seconds * 1000;
+          return timeA - timeB;
+        });
+        
+        sortedData.forEach((item, index) => {
           const status = hitungStatus(item);
-
-          // ======================
-          // SUARA OTOMATIS
-          // ======================
-
+          
+          // Panggil suara otomatis jika baru saja selesai (selesai && belum dipanggil)
           if (status.selesai && !suaraDipanggil[item.id]) {
             suaraDipanggil[item.id] = true;
-
             panggilanTerakhir = {
               nomor: index + 1,
-
               nama: item.nama,
-
               wbp: item.wbp,
             };
-
             playSuara(index + 1, item.nama, item.wbp);
-
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
-
+          
           tbody.innerHTML += `
-
-        <tr>
-
-            <td>${index + 1}</td>
-
-            <td>${escapeHtml(item.nama)}</td>
-
-            <td>${escapeHtml(item.wbp)}</td>
-
-            <td>
-
-                <span class="${status.class}">
-
-                    ${status.text}
-
-                </span>
-
-            </td>
-
-            <td>
-
-                <button
-                    class="btn-hapus-satu"
-                    onclick="hapusData('${item.id}')">
-
-                    🗑 Hapus
-
-                </button>
-
-            </td>
-
-        </tr>
-        `;
+            <tr>
+              <td>${index + 1}</td>
+              <td>${escapeHtml(item.nama)}</td>
+              <td>${escapeHtml(item.wbp)}</td>
+              <td><span class="${status.class}">${status.text}</span></td>
+              <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
+            </tr>
+          `;
         });
       }
-
-      // ======================
-      // ESCAPE HTML
-      // ======================
 
       function escapeHtml(str) {
         if (!str) return "";
-
-        return str.replace(
-          /[&<>]/g,
-
-          (m) =>
-            ({
-              "&": "&amp;",
-
-              "<": "&lt;",
-
-              ">": "&gt;",
-            })[m],
-        );
+        return str.replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
       }
-
-      // ======================
-      // NOTIF
-      // ======================
 
       function tampilNotif(judul, pesan, warna) {
         const box = document.getElementById("notifikasi");
-
-        box.innerHTML = `
-
-    <div style="
-        position:fixed;
-        top:20px;
-        right:20px;
-        background:${warna};
-        color:white;
-        padding:16px;
-        border-radius:24px;
-        z-index:10000;
-    ">
-
-        <strong>${judul}</strong><br>
-
-        ${pesan}
-
-    </div>
-    `;
-
+        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
         box.style.display = "block";
-
-        setTimeout(() => {
-          box.style.display = "none";
-        }, 4000);
+        setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
-      // ======================
-      // HAPUS SATU
-      // ======================
-
+      // ====================== HAPUS SATU & SEMUA ======================
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
-
         await deleteDoc(doc(db, "antrian", id));
       };
 
-      // ======================
-      // HAPUS SEMUA
-      // ======================
-
       window.hapusSemuaData = async function () {
-        if (!confirm("Hapus semua antrian?")) return;
-
+        if (!confirm("⚠️ Hapus SEMUA antrian? Tindakan ini tidak bisa dibatalkan.")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
-
         const promises = [];
-
-        snapshot.forEach((d) => {
-          promises.push(deleteDoc(doc(db, "antrian", d.id)));
-        });
-
+        snapshot.forEach((d) => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
+        suaraDipanggil = {}; // reset riwayat panggilan suara
       };
 
-      // ======================
-      // ULANGI SUARA
-      // ======================
-
+      // ====================== ULANGI PANGGILAN TERAKHIR ======================
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
-          alert("Belum ada panggilan.");
-
+          alert("Belum ada panggilan selesai.");
           return;
         }
-
-        await playSuara(
-          panggilanTerakhir.nomor,
-
-          panggilanTerakhir.nama,
-
-          panggilanTerakhir.wbp,
-        );
+        await playSuara(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
       };
 
-      // ======================
-      // FULLSCREEN
-      // ======================
-
+      // ====================== FULLSCREEN ======================
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ======================
-      // REALTIME LISTENER
-      // ======================
+      // ====================== REALTIME LISTENER (dengan update urutan) ======================
+      onSnapshot(collection(db, "antrian"), (snapshot) => {
+        daftarData = [];
+        snapshot.forEach((doc) => {
+          daftarData.push({ id: doc.id, ...doc.data() });
+        });
+        renderTabel();
+      });
 
-      onSnapshot(
-        collection(db, "antrian"),
-
-        (snapshot) => {
-          daftarData = [];
-
-          snapshot.forEach((doc) => {
-            daftarData.push({
-              id: doc.id,
-
-              ...doc.data(),
-            });
-          });
-
-          renderTabel();
-        },
-      );
-
-      // ======================
-      // AUTO TIMER RENDER
-      // ======================
-
+      // Update timer setiap detik (agar countdown berjalan mulus)
       setInterval(() => {
         renderTabel();
       }, 1000);
 
-      // ======================
-      // INIT
-      // ======================
-
+      // ====================== INIT SUARA ======================
       window.onload = async function () {
         await getSuaraPerempuan();
+        // Tampilkan info refresh otomatis
+        document.getElementById("refreshIndicator").innerText = "⏱️ Update realtime + countdown setiap detik";
       };
     </script>
   </body>
