@@ -415,7 +415,7 @@
         }
 
         if (belumSelesai.length > 0) {
-          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN / PERSIAPAN (10 detik) → 20 menit</td></tr>`;
+          tbody.innerHTML += `<tr class="group-header"><td colspan="5">🟢 ANTRIAN BERJALAN  </td></tr>`;
           for (const item of belumSelesai) {
             tbody.innerHTML += renderBaris(item, item.statusObj);
           }
@@ -427,9 +427,6 @@
             tbody.innerHTML += renderBaris(item, item.statusObj);
           }
         }
-
-        if (daftarData.length === 0) {
-          tbody.innerHTML = `<tr class="empty-row"><td colspan="5">✨ Tidak ada antrian aktif ✨</td></tr>`;
         }
       }
 
