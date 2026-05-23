@@ -213,7 +213,6 @@
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
     <div id="notifikasi" style="display: none"></div>
-    <div class="auto-refresh-badge" id="refreshIndicator">LIVE SYNC | ⏱️ Kunjungan: 20 menit (default)</div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -344,13 +343,13 @@
         const sekarang = Date.now();
         const elapsed = Math.floor((sekarang - created) / 1000);
         // Durasi persiapan default (10 detik)
-        const persiapan = (item.durasiPersiapan && !isNaN(item.durasiPersiapan)) ? item.durasiPersiapan : 300;
+        const persiapan = (item.durasiPersiapan && !isNaN(item.durasiPersiapan)) ? item.durasiPersiapan : 10;
         // Durasi kunjungan default 20 MENIT = 1200 DETIK
         const kunjungan = (item.durasiKunjungan && !isNaN(item.durasiKunjungan)) ? item.durasiKunjungan : 1200;
         
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
-          return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau", selesai: false };
+          return { text: `⏳ PERSIAPAN (${10}s)`, class: "hijau", selesai: false };
         }
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
