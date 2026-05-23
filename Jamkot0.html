@@ -197,7 +197,7 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       // ======================
       // FIREBASE CONFIG
@@ -220,12 +220,15 @@
       // ======================
       // GLOBAL
       // ======================
-      let daftarData = [];
+      let daftarData = [];       // akan diurutkan berdasarkan createdAt
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      let suaraDipanggil = {};
       
-      // Pengelola audio & speech agar tidak tumpuk
+      // QUEUE SUARA
+      let antrianSuara = [];     // setiap item: { nomor, nama, wbp, id }
+      let sedangMemutar = false;
+      
+      // Referensi audio/speech untuk pemutaran saat ini
       let currentAudio = null;
       let currentSpeech = null;
 
@@ -249,7 +252,7 @@
         });
       }
 
-      // Hentikan semua suara (audio + speech) yang sedang berjalan
+      // Hentikan semua suara yang sedang berjalan
       function hentikanSemuaSuara() {
         if (currentAudio) {
           currentAudio.pause();
@@ -262,62 +265,92 @@
         }
       }
 
-      // Teks panggilan (diawali "Mohon Perhatian")
+      // Teks panggilan lengkap
       function buatTeksPanggilan(nomor, nama, wbp) {
         return `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama} berkunjung untuk saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
       }
 
-      // ======================
-      // FUNGSI UTAMA: BACKSOUND DULU, LALU SPEECH
-      // ======================
-      async function playSuaraDenganBacksound(nomor, nama, wbp) {
-        // Matikan suara sebelumnya
-        hentikanSemuaSuara();
-        
-        // Putar backsound.mpeg terlebih dahulu
-        const audio = new Audio("backsound.mpeg");
-        currentAudio = audio;
-        
-        // Jika gagal load / error, tetap lanjut speech (tanpa backsound)
-        audio.onerror = () => {
-          console.warn("Gagal memuat atau memutar backsound.mpeg, langsung lanjut ke speech.");
-          currentAudio = null;
-          jalankanSpeech(nomor, nama, wbp);
-        };
-        
-        // Ketika backsound selesai, baru jalankan speech
-        audio.onended = () => {
-          currentAudio = null;
-          jalankanSpeech(nomor, nama, wbp);
-        };
-        
-        // Mulai putar backsound
-        try {
-          await audio.play();
-        } catch (err) {
-          console.warn("Autoplay backsound diblokir atau error:", err);
-          currentAudio = null;
-          jalankanSpeech(nomor, nama, wbp);
-        }
+      // Memutar backsound lalu speech (tanpa hentikan suara sebelumnya, karena kita pakai queue)
+      // Fungsi ini akan dipanggil oleh proses queue
+      async function playSuaraDenganBacksound(nomor, nama, wbp, id) {
+        return new Promise(async (resolve, reject) => {
+          // Putar backsound
+          const audio = new Audio("backsound.mpeg");
+          currentAudio = audio;
+          
+          audio.onerror = () => {
+            console.warn("Gagal memuat backsound.mpeg, lanjut speech");
+            currentAudio = null;
+            jalankanSpeech(nomor, nama, wbp).then(resolve).catch(reject);
+          };
+          
+          audio.onended = () => {
+            currentAudio = null;
+            jalankanSpeech(nomor, nama, wbp).then(resolve).catch(reject);
+          };
+          
+          try {
+            await audio.play();
+          } catch (err) {
+            console.warn("Autoplay backsound error:", err);
+            currentAudio = null;
+            jalankanSpeech(nomor, nama, wbp).then(resolve).catch(reject);
+          }
+        });
       }
       
       async function jalankanSpeech(nomor, nama, wbp) {
-        const teks = buatTeksPanggilan(nomor, nama, wbp);
-        const speech = new SpeechSynthesisUtterance(teks);
-        speech.lang = "id-ID";
-        speech.rate = 0.92;
-        speech.pitch = 1.1;
-        speech.voice = await getSuaraPerempuan();
+        return new Promise(async (resolve) => {
+          const teks = buatTeksPanggilan(nomor, nama, wbp);
+          const speech = new SpeechSynthesisUtterance(teks);
+          speech.lang = "id-ID";
+          speech.rate = 0.92;
+          speech.pitch = 1.1;
+          speech.voice = await getSuaraPerempuan();
+          
+          currentSpeech = speech;
+          speech.onend = () => {
+            currentSpeech = null;
+            resolve();
+          };
+          speech.onerror = () => {
+            currentSpeech = null;
+            resolve();
+          };
+          
+          speechSynthesis.speak(speech);
+        });
+      }
+
+      // Proses antrian suara
+      async function prosesAntrianSuara() {
+        if (sedangMemutar) return;
+        if (antrianSuara.length === 0) return;
         
-        currentSpeech = speech;
-        speech.onend = () => { currentSpeech = null; };
-        speech.onerror = () => { currentSpeech = null; };
+        sedangMemutar = true;
+        const item = antrianSuara.shift();
         
-        speechSynthesis.speak(speech);
+        try {
+          await playSuaraDenganBacksound(item.nomor, item.nama, item.wbp, item.id);
+          // Setelah selesai, tandai di Firebase bahwa sudah called (jika belum)
+          const docRef = doc(db, "antrian", item.id);
+          await updateDoc(docRef, { called: true });
+        } catch (err) {
+          console.error("Error memutar suara:", err);
+        } finally {
+          sedangMemutar = false;
+          prosesAntrianSuara(); // lanjut antrian berikutnya
+        }
+      }
+      
+      // Tambahkan ke antrian suara
+      function tambahAntrianSuara(nomor, nama, wbp, id) {
+        antrianSuara.push({ nomor, nama, wbp, id });
+        prosesAntrianSuara();
       }
 
       // ======================
-      // STATUS TIMER (HITUNG WAKTU)
+      // STATUS TIMER
       // ======================
       function hitungStatus(item) {
         if (!item.createdAt) {
@@ -346,31 +379,40 @@
       }
 
       // ======================
-      // RENDER TABEL + PANGGIL OTOMATIS SAAT SELESAI
+      // RENDER TABEL + CEK PANGGILAN OTOMATIS
       // ======================
       function renderTabel() {
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         
-        daftarData.forEach((item, index) => {
+        // Urutkan data berdasarkan createdAt ascending (yang paling awal input mendapat nomor kecil)
+        const dataTerurut = [...daftarData].sort((a, b) => {
+          const tA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+          const tB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+          return tA - tB;
+        });
+        
+        dataTerurut.forEach((item, index) => {
           const status = hitungStatus(item);
+          const nomorAntrian = index + 1;
           
-          // Jika status selesai dan belum pernah dipanggil, panggil dengan backsound dulu
-          if (status.selesai && !suaraDipanggil[item.id]) {
-            suaraDipanggil[item.id] = true;
+          // Cek apakah status SELESAI dan belum pernah dipanggil (called !== true)
+          if (status.selesai && !item.called) {
+            // Catat panggilan terakhir untuk tombol ulang
             panggilanTerakhir = {
-              nomor: index + 1,
+              nomor: nomorAntrian,
               nama: item.nama,
               wbp: item.wbp,
+              id: item.id
             };
-            // Urutan: backsound habis → speech "Mohon Perhatian..."
-            playSuaraDenganBacksound(index + 1, item.nama, item.wbp);
+            // Tambahkan ke antrian suara (tidak langsung diputar, tapi masuk queue)
+            tambahAntrianSuara(nomorAntrian, item.nama, item.wbp, item.id);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           
           tbody.innerHTML += `
             <tr>
-              <td>${index + 1}</td>
+              <td>${nomorAntrian}</td>
               <td>${escapeHtml(item.nama)}</td>
               <td>${escapeHtml(item.wbp)}</td>
               <td><span class="${status.class}">${status.text}</span></td>
@@ -402,7 +444,7 @@
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
-        delete suaraDipanggil[id];
+        // Jika data yang dihapus sedang dalam antrian suara, tidak masalah karena queue akan tetap jalan
       };
 
       window.hapusSemuaData = async function () {
@@ -411,20 +453,31 @@
         const promises = [];
         snapshot.forEach((d) => {
           promises.push(deleteDoc(doc(db, "antrian", d.id)));
-          delete suaraDipanggil[d.id];
         });
         await Promise.all(promises);
+        // Kosongkan antrian suara karena semua data hilang
+        antrianSuara = [];
+        hentikanSemuaSuara();
+        sedangMemutar = false;
       };
 
       // ======================
-      // ULANGI PANGGILAN TERAKHIR (juga dengan backsound dulu)
+      // ULANGI PANGGILAN TERAKHIR (dengan antrian juga)
       // ======================
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
           alert("Belum ada panggilan.");
           return;
         }
-        await playSuaraDenganBacksound(panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+        // Untuk tombol ulang, kita panggil langsung tanpa menandai called (karena manual)
+        // Tapi kita masukkan ke antrian juga agar tidak potong suara yang sedang berjalan
+        antrianSuara.push({
+          nomor: panggilanTerakhir.nomor,
+          nama: panggilanTerakhir.nama,
+          wbp: panggilanTerakhir.wbp,
+          id: panggilanTerakhir.id + "_ulang" // id unik agar tidak bentrok
+        });
+        prosesAntrianSuara();
       };
 
       // ======================
@@ -440,24 +493,28 @@
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         daftarData = [];
         snapshot.forEach((doc) => {
-          daftarData.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          daftarData.push({
+            id: doc.id,
+            ...data,
+            called: data.called || false   // pastikan ada field called
+          });
         });
         renderTabel();
       });
 
       // ======================
-      // UPDATE TIMER SETIAP DETIK
+      // UPDATE TIMER SETIAP DETIK (refresh tampilan)
       // ======================
       setInterval(() => {
         renderTabel();
       }, 1000);
 
       // ======================
-      // INIT (PRELOAD BACKSOUND)
+      // INIT (PRELOAD BACKSOUND & SUARA)
       // ======================
       window.onload = async function () {
         await getSuaraPerempuan();
-        // Preload backsound agar lebih cepat saat pertama kali dipanggil
         const preload = new Audio("backsound.mpeg");
         preload.load();
       };
