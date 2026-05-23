@@ -215,8 +215,7 @@
       let daftarData = [];
       let panggilanTerakhir = null;
       let suaraPerempuan = null;
-      // Untuk backsound lokal (tidak perlu persist, hanya mencegah spam dalam satu sesi)
-      let backsoundPlayedMap = {};
+      let backsoundPlayedMap = {}; // untuk mencegah backsound double dalam satu sesi
       
       let serverTimeOffset = 0;
       let isOffsetReady = false;
@@ -341,10 +340,6 @@
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = Math.floor(sisa % 60);
-          // Putar backsound jika sisa <= 3 detik (hanya sekali per sesi lokal)
-          if (sisa <= 3 && !backsoundPlayedMap[item.id]) {
-            putarBacksound(item.id);
-          }
           return { 
             text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, 
             class: sisa <= 10 ? "merah" : "" 
@@ -371,16 +366,17 @@
         for (const item of sortedData) {
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor;
-          // Jika nomor tidak ada (data lama), tampilkan tanda "—"
           if (!nomorAntrian || nomorAntrian === 0) {
             nomorAntrian = "—";
           }
           
-          // Panggil suara hanya jika selesai dan belum pernah dipanggil (cek dari database)
+          // Jika waktu habis dan belum pernah dipanggil
           if (status.selesai && !item.sudahDipanggil) {
-            // Tandai sudah dipanggil di Firestore agar tidak terulang setelah refresh
+            // Putar backsound DULUAN (tepat saat habis)
+            putarBacksound(item.id);
+            
+            // Tandai sudah dipanggil di Firestore
             await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
-            // Update data lokal agar tidak memanggil lagi dalam sesi yang sama
             item.sudahDipanggil = true;
             
             panggilanTerakhir = {
@@ -388,6 +384,7 @@
               nama: item.nama,
               wbp: item.wbp,
             };
+            // Kemudian putar suara pemberitahuan
             playSuara(nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
@@ -463,7 +460,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Nomor tetap | Panggilan hanya sekali | Urutan DESC";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound saat habis | Panggilan sekali | Urutan DESC";
         renderTabel();
       };
     </script>
