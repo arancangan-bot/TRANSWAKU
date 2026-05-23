@@ -128,8 +128,8 @@
         <h2>📋 TAMBAH ANTRIAN</h2>
         <p>Lapas Kelas IIA Cikarang</p>
       </div>
-      <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="Nama lengkap" /></div>
-      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="Nama WBP" autocomplete="off" /></div>
+      <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder /></div>
+      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder autocomplete="off" /></div>
       <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
       <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
     </div>
@@ -150,9 +150,15 @@
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
+      // ======================
+      // INIT FIREBASE
+      // ======================
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
+      // ======================
+      // LOAD JUMLAH ANTRIAN
+      // ======================
       async function loadData() {
         try {
           const snapshot = await getDocs(collection(db, "antrian"));
@@ -162,6 +168,9 @@
         }
       }
 
+      // ======================
+      // NOTIFIKASI
+      // ======================
       function tampilNotif(pesan, isError = false) {
         let div = document.createElement("div");
         div.className = "notif-sukses";
@@ -170,11 +179,12 @@
         let container = document.getElementById("notifTemp");
         container.innerHTML = "";
         container.appendChild(div);
-        setTimeout(() => {
-          div.remove();
-        }, 3000);
+        setTimeout(() => { div.remove(); }, 3000);
       }
 
+      // ======================
+      // TAMBAH ANTRIAN
+      // ======================
       window.tambahAntrianBaru = async function () {
         let nama = document.getElementById("namaPengunjung").value.trim();
         let wbp = document.getElementById("namaWbp").value.trim();
@@ -190,11 +200,10 @@
             wbp: wbp,
             status: "persiapan",
             createdAt: serverTimestamp(),
-            durasiPersiapan: 10,        // 10 detik persiapan
-            durasiKunjungan: 1200,      // 20 MENIT = 1200 detik
+            durasiPersiapan: 10,      // 10 detik persiapan (WARNA HIJAU)
+            durasiKunjungan: 1200,    // 20 MENIT (1200 detik)
           });
-
-          tampilNotif(`✅ Antrian berhasil ditambahkan (durasi kunjungan 20 menit)`);
+          tampilNotif(`✅ Antrian berhasil ditambahkan`);
           document.getElementById("namaPengunjung").value = "";
           document.getElementById("namaWbp").value = "";
           document.getElementById("namaPengunjung").focus();
@@ -205,10 +214,16 @@
         }
       };
 
+      // ======================
+      // KEMBALI DASHBOARD
+      // ======================
       window.kembaliKeDashboard = function () {
         window.location.href = "./kuy.html";
       };
 
+      // ======================
+      // INIT
+      // ======================
       loadData();
       setInterval(loadData, 5000);
     </script>
