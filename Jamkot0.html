@@ -197,7 +197,7 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       // ====================== FIREBASE CONFIG ======================
       const firebaseConfig = {
@@ -218,54 +218,53 @@
       let suaraPerempuan = null;
       let suaraDipanggil = {};
       
-      // Offset waktu server (milidetik) = waktu server - waktu lokal
-      // Dengan rumus: serverNow = Date.now() + serverTimeOffset
-      let serverTimeOffset = 0; 
-      let isOffsetCalibrated = false;
+      // Offset server (ms) = serverTime - clientTime
+      let serverTimeOffset = 0;
+      let isOffsetReady = false;
 
-      // ====================== KALIBRASI OFFSET SERVER ======================
-      // Fungsi ini dipanggil setiap snapshot untuk menghitung offset berdasarkan data pertama yang memiliki createdAt
-      function calibrateServerOffset(snapshotData) {
-        if (isOffsetCalibrated) return;
-        // Cari data pertama yang memiliki createdAt (timestamp server)
-        const itemWithServerTime = snapshotData.find(item => item.createdAt && typeof item.createdAt.toDate === 'function');
-        if (!itemWithServerTime) return;
-        
-        const serverCreated = itemWithServerTime.createdAt.toDate().getTime();
-        const clientNow = Date.now();
-        // Karena data sudah diterima, asumsikan waktu server saat creation diketahui.
-        // Kita hitung offset: serverTime = clientTime - offset? Mari kita tentukan offset = clientNow - serverCreated
-        // Maka serverNow = clientNow - offset. Namun perlu diingat bahwa data dibuat di masa lalu.
-        // Yang kita butuh: elapsed = (serverCurrentTime - serverCreated). 
-        // serverCurrentTime tidak kita ketahui, tapi kita bisa hitung offset dari client.
-        // Lebih baik: kita catat selisih antara client time dan server time pada saat snapshot.
-        // Karena snapshot diterima segera, kita asumsikan clientNow = serverNow + (client-server diff).
-        // Maka serverNow = clientNow - diff. Diff = clientNow - serverCreated - (elapsed sejak creation sampai snapshot)
-        // Namun elapsed kecil (ms), abaikan. Pendekatan praktis: gunakan serverCreated sebagai anchor.
-        // Kita hitung diff = clientNow - serverCreated. Maka perkiraan serverNow = clientNow - diff.
-        // Tapi diff akan besar karena data dibuat di masa lalu. 
-        // Solusi: kita ambil snapshot timestamp dari metadata? Tidak ada. Alternatif: ambil data terbaru?
-        // Pendekatan yang lebih stabil: saat menerima snapshot, kita catat clientTimeSnapshot dan ambil createdAt dari dokumen TERBARU (waktu paling besar).
-        // Karena itu akan mendekati waktu server saat snapshot.
-        let latestServerTime = 0;
-        for (let item of snapshotData) {
-          if (item.createdAt && typeof item.createdAt.toDate === 'function') {
-            const t = item.createdAt.toDate().getTime();
-            if (t > latestServerTime) latestServerTime = t;
+      // ====================== KALIBRASI SERVER TIME (LANGSUNG & DISIMPAN) ======================
+      async function calibrateServerTime() {
+        // Coba ambil dari localStorage terlebih dahulu (agar cepat saat refresh)
+        const savedOffset = localStorage.getItem("serverTimeOffset");
+        const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
+        if (savedOffset && savedTime) {
+          const age = Date.now() - parseInt(savedTime);
+          // Jika offset disimpan kurang dari 5 menit, gunakan langsung
+          if (age < 5 * 60 * 1000) {
+            serverTimeOffset = parseInt(savedOffset);
+            isOffsetReady = true;
+            console.log("✅ Offset dari localStorage:", serverTimeOffset, "ms");
+            return;
           }
         }
-        if (latestServerTime === 0) return;
-        const clientTimeSnapshot = Date.now();
-        // Asumsikan server time saat snapshot = latestServerTime (data terbaru dibuat sesaat sebelum snapshot)
-        // Maka offset = clientTimeSnapshot - latestServerTime (positif jika client lebih cepat)
-        serverTimeOffset = clientTimeSnapshot - latestServerTime;
-        isOffsetCalibrated = true;
-        console.log(`Offset server terkalibrasi: ${serverTimeOffset} ms (client ${serverTimeOffset > 0 ? 'lebih cepat' : 'lebih lambat'} dari server)`);
+        
+        // Kalibrasi ulang dengan membuat dokumen sementara
+        try {
+          const tempRef = doc(collection(db, "tempTime"));
+          const beforeClient = Date.now();
+          await setDoc(tempRef, { ping: serverTimestamp() });
+          const snapshot = await getDoc(tempRef);
+          const serverTime = snapshot.data().ping.toDate().getTime();
+          const afterClient = Date.now();
+          const clientTime = (beforeClient + afterClient) / 2;
+          serverTimeOffset = serverTime - clientTime;
+          // Simpan ke localStorage
+          localStorage.setItem("serverTimeOffset", serverTimeOffset);
+          localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
+          isOffsetReady = true;
+          console.log("🔄 Kalibrasi server selesai, offset:", serverTimeOffset, "ms");
+          // Hapus dokumen temporary
+          await deleteDoc(tempRef);
+        } catch (err) {
+          console.error("Gagal kalibrasi server time:", err);
+          // Fallback: offset 0 (gunakan client time)
+          serverTimeOffset = 0;
+          isOffsetReady = true;
+        }
       }
 
-      // Mendapatkan waktu server saat ini (dalam milidetik)
       function getCurrentServerTime() {
-        return Date.now() - serverTimeOffset;
+        return Date.now() + serverTimeOffset;
       }
 
       // ====================== SUARA ======================
@@ -296,7 +295,7 @@
         speechSynthesis.speak(speech);
       }
 
-      // ====================== STATUS TIMER (berbasis server time) ======================
+      // ====================== STATUS TIMER (LANGSUNG, TANPA JEDA) ======================
       function hitungStatus(item) {
         if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
           return { text: "⏳ Memuat...", class: "hijau" };
@@ -309,13 +308,11 @@
         const persiapan = item.durasiPersiapan || 10;
         const kunjungan = item.durasiKunjungan || 300;
         
-        // Tahap PERSIAPAN
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${sisa}s)`, class: "hijau" };
         }
         
-        // Tahap KUNJUNGAN
         const elapsedKunjungan = elapsed - persiapan;
         if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
@@ -332,10 +329,15 @@
 
       // ====================== RENDER TABEL ======================
       function renderTabel() {
+        if (!isOffsetReady) {
+          // Tampilkan pesan loading jika offset belum siap
+          document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
+          return;
+        }
+        
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         
-        // Urutkan berdasarkan server createdAt (FIFO)
         const sortedData = [...daftarData].sort((a, b) => {
           let timeA = a.createdAt?.toDate?.()?.getTime() || 0;
           let timeB = b.createdAt?.toDate?.()?.getTime() || 0;
@@ -384,6 +386,8 @@
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
+        // Hapus juga riwayat suara untuk ID tersebut
+        delete suaraDipanggil[id];
       };
 
       window.hapusSemuaData = async function () {
@@ -414,24 +418,20 @@
           newData.push({ id: doc.id, ...doc.data() });
         });
         daftarData = newData;
-        
-        // Kalibrasi offset server berdasarkan data yang ada (hanya sekali)
-        if (!isOffsetCalibrated && daftarData.length > 0) {
-          calibrateServerOffset(daftarData);
-        }
-        
         renderTabel();
       });
 
       // Update timer setiap detik
       setInterval(() => {
-        if (isOffsetCalibrated) renderTabel();
+        renderTabel();
       }, 1000);
 
       // ====================== INIT ======================
       window.onload = async function () {
+        await calibrateServerTime();  // Kalibrasi langsung, tanpa jeda
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerText = "⏱️ Sinkronisasi waktu server | Update realtime";
+        document.getElementById("refreshIndicator").innerHTML = "⏱️ Waktu tersinkronisasi server | Update realtime";
+        renderTabel(); // Tampilkan data (jika ada)
       };
     </script>
   </body>
