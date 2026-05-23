@@ -128,153 +128,90 @@
         <h2>📋 TAMBAH ANTRIAN</h2>
         <p>Lapas Kelas IIA Cikarang</p>
       </div>
-      <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder /></div>
-      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="autocomplete" ="off" /></div>
+      <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="contoh: Budi Santoso" /></div>
+      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="contoh: Andi Wijaya" autocomplete="off" /></div>
       <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
       <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
     </div>
     <div id="notifTemp"></div>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-
       import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-      // ======================
-      // FIREBASE CONFIG
-      // ======================
-
+      // ====================== FIREBASE CONFIG ======================
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
-
         authDomain: "ruang-kunjungan.firebaseapp.com",
-
         projectId: "ruang-kunjungan",
-
         storageBucket: "ruang-kunjungan.firebasestorage.app",
-
         messagingSenderId: "1070275298561",
-
         appId: "1:1070275298561:web:c74c42680e7fded17e8700",
       };
 
-      // ======================
-      // INIT FIREBASE
-      // ======================
-
+      // ====================== INIT FIREBASE ======================
       const app = initializeApp(firebaseConfig);
-
       const db = getFirestore(app);
 
-      // ======================
-      // LOAD JUMLAH ANTRIAN
-      // ======================
-
+      // ====================== LOAD JUMLAH ANTRIAN ======================
       async function loadData() {
         try {
           const snapshot = await getDocs(collection(db, "antrian"));
-
           document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${snapshot.size} orang`;
         } catch (error) {
           console.error(error);
         }
       }
 
-      // ======================
-      // NOTIFIKASI
-      // ======================
-
       function tampilNotif(pesan, isError = false) {
         let div = document.createElement("div");
-
         div.className = "notif-sukses";
-
         div.style.background = isError ? "#b91c1c" : "#0e7c32";
-
         div.innerText = pesan;
-
         let container = document.getElementById("notifTemp");
-
         container.innerHTML = "";
-
         container.appendChild(div);
-
-        setTimeout(() => {
-          div.remove();
-        }, 3000);
+        setTimeout(() => { div.remove(); }, 3000);
       }
 
-      // ======================
-      // TAMBAH ANTRIAN
-      // ======================
-
+      // ====================== TAMBAH ANTRIAN (DURASI KUNJUNGAN 5 MENIT = 300 DETIK) ======================
       window.tambahAntrianBaru = async function () {
         let nama = document.getElementById("namaPengunjung").value.trim();
-
         let wbp = document.getElementById("namaWbp").value.trim();
-
-        // VALIDASI
 
         if (!nama || !wbp) {
           tampilNotif("⚠️ Nama Pengunjung dan Nama WBP wajib diisi!", true);
-
           return;
         }
 
         try {
-          // SIMPAN KE FIREBASE
+          // DURASI KUNJUNGAN DI SET 5 MENIT = 300 DETIK
+          // DURASI PERSIAPAN TETAP 10 DETIK
+          await addDoc(collection(db, "antrian"), {
+            nama: nama,
+            wbp: wbp,
+            status: "persiapan",
+            createdAt: serverTimestamp(),
+            durasiPersiapan: 10,        // 10 detik persiapan
+            durasiKunjungan: 300,       // 5 MENIT (300 detik) sesuai permintaan
+          });
 
-          await addDoc(
-            collection(db, "antrian"),
-
-            {
-              nama: nama,
-
-              wbp: wbp,
-
-              status: "persiapan",
-
-              createdAt: serverTimestamp(),
-
-              durasiPersiapan: 10,
-
-              durasiKunjungan: 120,
-            },
-          );
-
-          tampilNotif(`✅ Antrian berhasil ditambahkan`);
-
-          // RESET INPUT
-
+          tampilNotif(`✅ Antrian berhasil ditambahkan (durasi kunjungan 5 menit)`);
           document.getElementById("namaPengunjung").value = "";
-
           document.getElementById("namaWbp").value = "";
-
           document.getElementById("namaPengunjung").focus();
-
-          // REFRESH COUNTER
-
-          loadData();
+          loadData(); // refresh jumlah antrian
         } catch (error) {
           console.error(error);
-
           tampilNotif("❌ Gagal menyimpan data ke Firebase", true);
         }
       };
-
-      // ======================
-      // KEMBALI DASHBOARD
-      // ======================
 
       window.kembaliKeDashboard = function () {
         window.location.href = "./Jamkot0.html";
       };
 
-      // ======================
-      // INIT
-      // ======================
-
+      // ====================== INIT & AUTO UPDATE JUMLAH ======================
       loadData();
-
       setInterval(loadData, 5000);
     </script>
   </body>
