@@ -167,14 +167,13 @@
 
       // ====================== GLOBAL ======================
       let daftarData = [];
-      let panggilanTerakhir = null;       // Hanya disimpan di memori, akan hilang jika refresh/device mati
+      let panggilanTerakhir = null;
       let suaraPerempuan = null;
       let callQueue = [];
       let isProcessingQueue = false;
       let serverTimeOffset = 0;
       let isOffsetReady = false;
 
-      // Sinkronisasi ulang panggilan antar device
       let lastRepeatTimestamp = 0;
       const repeatCallDocRef = doc(db, "global", "repeatCall");
 
@@ -280,7 +279,7 @@
         let elapsed = (serverNow - serverCreated) / 1000;
         if (elapsed < 0) elapsed = 0;
         const persiapan = item.durasiPersiapan || 10;
-        const kunjungan = item.durasiKunjungan || 15; // 15 detik untuk demo
+        const kunjungan = item.durasiKunjungan || 15;
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
@@ -295,7 +294,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL & PANGGILAN OTOMATIS (HANYA SEKALI) ======================
+      // ====================== RENDER TABEL & PANGGILAN OTOMATIS DENGAN TRANSAKSI ======================
       let renderRequestId = null;
       async function renderTabel() {
         if (!isOffsetReady) {
@@ -310,20 +309,24 @@
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor || "—";
           
-          // HANYA panggil jika status SELESAI dan BELUM PERNAH dipanggil
-          // Field "sudahDipanggil" menjamin bahwa satu antrian hanya dipanggil sekali seumur hidup
+          // Gunakan transaksi untuk menghindari double call
           if (status.selesai && !item.sudahDipanggil) {
+            const itemRef = doc(db, "antrian", item.id);
             try {
-              // Tandai sudah dipanggil di Firestore
-              await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
+              await runTransaction(db, async (transaction) => {
+                const snap = await transaction.get(itemRef);
+                if (snap.exists() && !snap.data().sudahDipanggil) {
+                  transaction.update(itemRef, { sudahDipanggil: true });
+                  // Simpan di memori untuk tombol ulang
+                  panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
+                  // Antrekan panggilan suara
+                  addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+                }
+              });
+              // Update item lokal agar tidak diproses lagi di loop berikutnya
               item.sudahDipanggil = true;
-              // Simpan data panggilan terakhir di memori (hanya untuk sesi ini)
-              panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
-              // Antrekan panggilan suara
-              addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
             } catch (err) {
-              console.error("Gagal update sudahDipanggil:", err);
-              // Jika gagal, jangan lanjutkan agar tidak double call
+              console.error("Gagal menandai sudahDipanggil dengan transaksi:", err);
             }
           }
           
@@ -351,14 +354,14 @@
       };
       
       window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian?")) return;
+        if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // Tidak menampilkan notifikasi apapun (sesuai permintaan)
+        // Tidak ada notifikasi visual
       };
 
       // ====================== ULANGI PANGGILAN (SINKRON SEMUA DEVICE) ======================
@@ -367,7 +370,6 @@
           console.warn("Tidak ada panggilan terakhir di sesi ini.");
           return;
         }
-        // Kirim perintah ke Firestore agar semua device yang terhubung ikut memanggil ulang
         const nowServer = Timestamp.now();
         await setDoc(repeatCallDocRef, {
           nomor: panggilanTerakhir.nomor,
@@ -379,7 +381,6 @@
         console.log("Perintah ulang panggilan dikirim ke Firestore");
       };
 
-      // Mendengarkan perintah ulang panggilan dari device manapun
       function listenRepeatCall() {
         onSnapshot(repeatCallDocRef, (docSnap) => {
           if (docSnap.exists()) {
@@ -399,7 +400,6 @@
         });
       }
 
-      // ====================== FULLSCREEN ======================
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
@@ -416,7 +416,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime";
+        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | No repeat call after finished";
         listenRepeatCall();
         renderTabel();
       };
