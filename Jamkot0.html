@@ -174,6 +174,9 @@
       let serverTimeOffset = 0;
       let isOffsetReady = false;
 
+      // Flag untuk mencegah panggilan/notifikasi saat pertama kali load
+      let isInitializing = true;
+
       // Referensi untuk sinkronisasi panggilan ulang
       const lastCallRef = doc(db, "meta", "lastCall");
       const repeatCallRef = doc(db, "triggers", "repeatCall");
@@ -326,10 +329,13 @@
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
+          // Cek apakah item baru saja mencapai status selesai dan belum dipanggil
           if (status.selesai && !item.sudahDipanggil) {
             try {
+              // Tandai sudah dipanggil di Firestore
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
+              
               // Simpan data panggilan terakhir ke Firestore (untuk sinkronisasi ulangi)
               const lastCallData = {
                 nomor: nomorAntrian,
@@ -339,12 +345,18 @@
               };
               await setDoc(lastCallRef, lastCallData, { merge: true });
               panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
+              
+              // HANYA JIKA BUKAN INISIALISASI AWAL, maka panggil suara & notif
+              if (!isInitializing) {
+                addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+                tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
+              } else {
+                console.log("⏸️ Skip panggilan/notif saat inisialisasi untuk:", item.nama);
+              }
             } catch (err) { 
               console.error("Gagal update sudahDipanggil:", err);
               continue;
             }
-            addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-            tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           tbody.innerHTML += `
             <tr>
@@ -436,7 +448,14 @@
         await calibrateServerTime();
         await getSuaraPerempuan();
         listenRepeatCall(); // Aktifkan listener panggilan ulang
-        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound SEKALI → jeda 3dt → suara | Antrean aman | Panggilan ulang sinkron semua device";
+        
+        // Setelah 2 detik, inisialisasi selesai, sehingga panggilan otomatis berikutnya akan aktif
+        setTimeout(() => {
+          isInitializing = false;
+          console.log("✅ Inisialisasi selesai. Panggilan otomatis dan notifikasi sekarang aktif.");
+        }, 2000);
+        
+        document.getElementById("refreshIndicator").innerHTML = "✅ Backsound → jeda 3dt → suara | Panggilan ulang sinkron | Notifikasi awal dimatikan";
         renderTabel();
       };
     </script>
