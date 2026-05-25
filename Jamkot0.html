@@ -116,9 +116,33 @@
         font-weight: bold;
         z-index: 999;
       }
+      /* Notifikasi visual (toast) */
+      .toast-notif {
+        position: fixed;
+        bottom: 30px;
+        right: 20px;
+        background: #facc15;
+        color: #1e3c4a;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 10000;
+        animation: fadeInOut 4s ease forwards;
+        font-size: 1rem;
+        max-width: 340px;
+        border-left: 6px solid #b91c1c;
+      }
+      @keyframes fadeInOut {
+        0% { opacity: 0; transform: translateX(50px); }
+        10% { opacity: 1; transform: translateX(0); }
+        90% { opacity: 1; transform: translateX(0); }
+        100% { opacity: 0; transform: translateX(50px); visibility: hidden; }
+      }
       @media (max-width: 700px) {
         .logo-left img, .logo-right img { height: 60px; }
         button { padding: 8px 16px; font-size: 0.8rem; }
+        .toast-notif { bottom: 20px; right: 10px; left: 10px; max-width: none; font-size: 0.9rem; }
       }
     </style>
   </head>
@@ -146,12 +170,12 @@
       </div>
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
-    <div id="notifikasi" style="display: none"></div>
+    <div id="notifVisualContainer"></div>
     <div class="auto-refresh-badge" id="refreshIndicator"></div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, runTransaction, Timestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, runTransaction, Timestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -173,9 +197,19 @@
       let isProcessingQueue = false;
       let serverTimeOffset = 0;
       let isOffsetReady = false;
-
       let lastRepeatTimestamp = 0;
       const repeatCallDocRef = doc(db, "global", "repeatCall");
+
+      // ====================== NOTIFIKASI VISUAL ======================
+      function showVisualNotification(nomor, nama, wbp, isRepeat = true) {
+        const container = document.getElementById("notifVisualContainer");
+        const toast = document.createElement("div");
+        toast.className = "toast-notif";
+        const judul = isRepeat ? "🔁 Panggilan Ulang" : "🔔 Panggilan Otomatis";
+        toast.innerHTML = `<strong>${judul}</strong><br>Antrian ${nomor} - ${nama} (WBP: ${wbp})`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+      }
 
       // ====================== KALIBRASI SERVER TIME ======================
       async function calibrateServerTime() {
@@ -213,7 +247,7 @@
         console.log("🔄 Kalibrasi selesai, offset median:", serverTimeOffset, "ms");
       }
       function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-      setInterval(async () => { if (isOffsetReady) { await calibrateServerTime(); renderTabel(); } }, 30000);
+      setInterval(() => { if (isOffsetReady) calibrateServerTime(); }, 30000);
 
       // ====================== SUARA & BACKSOUND ======================
       async function getSuaraPerempuan() {
@@ -249,7 +283,8 @@
         console.log("🔊 Backsound diputar (sekali)");
       }
 
-      async function panggilSekali(nomor, nama, wbp) {
+      async function panggilSekali(nomor, nama, wbp, showNotif = true, isRepeat = false) {
+        if (showNotif) showVisualNotification(nomor, nama, wbp, isRepeat);
         putarBacksound();
         await new Promise(resolve => setTimeout(resolve, 3000));
         await playSuara(nomor, nama, wbp);
@@ -294,8 +329,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL & PANGGILAN OTOMATIS DENGAN TRANSAKSI ======================
-      let renderRequestId = null;
+      // ====================== RENDER TABEL & PANGGILAN OTOMATIS SEKALI ======================
       async function renderTabel() {
         if (!isOffsetReady) {
           document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
@@ -307,9 +341,8 @@
         
         for (const item of sortedData) {
           const status = hitungStatus(item);
-          let nomorAntrian = item.nomor || "—";
+          const nomorAntrian = item.nomor || "—";
           
-          // Gunakan transaksi untuk menghindari double call
           if (status.selesai && !item.sudahDipanggil) {
             const itemRef = doc(db, "antrian", item.id);
             try {
@@ -317,16 +350,13 @@
                 const snap = await transaction.get(itemRef);
                 if (snap.exists() && !snap.data().sudahDipanggil) {
                   transaction.update(itemRef, { sudahDipanggil: true });
-                  // Simpan di memori untuk tombol ulang
                   panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
-                  // Antrekan panggilan suara
-                  addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+                  addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp, true, false);
                 }
               });
-              // Update item lokal agar tidak diproses lagi di loop berikutnya
               item.sudahDipanggil = true;
             } catch (err) {
-              console.error("Gagal menandai sudahDipanggil dengan transaksi:", err);
+              console.error("Gagal menandai sudahDipanggil:", err);
             }
           }
           
@@ -340,9 +370,6 @@
             </tr>
           `;
         }
-        
-        if (renderRequestId) cancelAnimationFrame(renderRequestId);
-        renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 100); });
       }
       
       function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
@@ -361,21 +388,21 @@
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // Tidak ada notifikasi visual
       };
 
-      // ====================== ULANGI PANGGILAN (SINKRON SEMUA DEVICE) ======================
+      // ====================== ULANGI PANGGILAN (SEMUA DEVICE) ======================
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
           console.warn("Tidak ada panggilan terakhir di sesi ini.");
+          // Tampilkan notifikasi peringatan hanya di device pengirim
+          showVisualNotification("?", "Tidak ada data", "Belum ada antrian selesai", true);
           return;
         }
-        const nowServer = Timestamp.now();
         await setDoc(repeatCallDocRef, {
           nomor: panggilanTerakhir.nomor,
           nama: panggilanTerakhir.nama,
           wbp: panggilanTerakhir.wbp,
-          timestamp: nowServer,
+          timestamp: serverTimestamp(),
           updatedAt: serverTimestamp()
         }, { merge: true });
         console.log("Perintah ulang panggilan dikirim ke Firestore");
@@ -385,13 +412,14 @@
         onSnapshot(repeatCallDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
-            const newTimestamp = data.timestamp?.toDate?.()?.getTime() || 0;
+            const newTimestamp = data.updatedAt?.toDate?.()?.getTime() || 0;
             if (newTimestamp > lastRepeatTimestamp && newTimestamp !== 0) {
               lastRepeatTimestamp = newTimestamp;
               const { nomor, nama, wbp } = data;
               if (nomor && nama && wbp) {
                 console.log(`📢 Menerima perintah ulang panggilan dari device lain: nomor ${nomor}`);
-                addToQueue(panggilSekali, nomor, nama, wbp);
+                // Jalankan panggilan ulang dengan notifikasi visual, backsound, suara
+                addToQueue(panggilSekali, nomor, nama, wbp, true, true);
               }
             }
           }
@@ -412,11 +440,16 @@
         renderTabel();
       });
 
+      // Update timer setiap detik agar countdown berjalan
+      setInterval(() => {
+        if (isOffsetReady && daftarData.length) renderTabel();
+      }, 1000);
+
       // ====================== INIT ======================
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | No repeat call after finished";
+        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | Notifikasi visual + suara multi-device";
         listenRepeatCall();
         renderTabel();
       };
