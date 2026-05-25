@@ -67,16 +67,6 @@
       .btn-input-page:hover { background: #3a9f7a; }
       .btn-fullscreen { background: #6b21a5; }
       .btn-fullscreen:hover { background: #8b3ac5; }
-      .btn-allow-sound {
-        background: #e67e22;
-        animation: pulse 1s infinite;
-      }
-      .btn-allow-sound:hover { background: #f39c12; }
-      @keyframes pulse {
-        0% { opacity: 0.7; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.02); background: #f39c12; }
-        100% { opacity: 0.7; transform: scale(1); }
-      }
       .table-wrapper {
         overflow-x: auto;
         max-height: 520px;
@@ -169,7 +159,6 @@
       <div class="toolbar-area">
         <button class="btn-input-page" onclick="window.location.href = 'input.html'">📝 Buka Halaman Input</button>
         <button class="btn-fullscreen" onclick="toggleFullscreen()">🖥️ Full Layar</button>
-        <button id="allowSoundBtn" class="btn-allow-sound">🔊 Izinkan Suara (Agar Backsound Berbunyi)</button>
       </div>
       <div class="table-wrapper">
         <table>
@@ -186,7 +175,7 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -208,11 +197,7 @@
       let serverTimeOffset = 0;
       let isOffsetReady = false;
       
-      // Audio approval (backsound)
-      let audioAllowed = false;
-      let backsoundAudio = null;
-      
-      // Referensi perintah panggilan ulang
+      // Referensi untuk perintah panggilan ulang (sinkronisasi antar device)
       const perintahPanggilanRef = collection(db, "perintah_panggilan");
 
       // ====================== KALIBRASI SERVER TIME ======================
@@ -253,78 +238,7 @@
       function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
       setInterval(async () => { if (isOffsetReady) { await calibrateServerTime(); renderTabel(); } }, 30000);
 
-      // ====================== IZINKAN SUARA (Backsound & Speech) ======================
-      async function preloadAudio() {
-        if (!backsoundAudio) {
-          backsoundAudio = new Audio("backsound.mpeg");
-          backsoundAudio.preload = "auto";
-          backsoundAudio.loop = false;
-        }
-        // Coba play silent untuk membuka izin autoplay
-        try {
-          const silent = new Audio();
-          silent.volume = 0;
-          await silent.play();
-          console.log("Audio context diizinkan secara global");
-          audioAllowed = true;
-          document.getElementById("allowSoundBtn")?.remove();
-        } catch (e) {
-          console.warn("Autoplay belum diizinkan, perlu interaksi pengguna");
-          audioAllowed = false;
-        }
-      }
-      
-      function enableAudioOnInteraction() {
-        if (audioAllowed) return;
-        const silentTest = new Audio();
-        silentTest.volume = 0;
-        silentTest.play().then(() => {
-          audioAllowed = true;
-          console.log("✅ Suara diizinkan oleh pengguna");
-          // Preload backsound agar siap
-          if (!backsoundAudio) {
-            backsoundAudio = new Audio("backsound.mpeg");
-            backsoundAudio.preload = "auto";
-          }
-          const btn = document.getElementById("allowSoundBtn");
-          if (btn) btn.style.display = "none";
-        }).catch(err => console.warn("Gagal izinkan suara", err));
-      }
-      
-      async function putarBacksound() {
-        if (!audioAllowed) {
-          console.warn("Suara belum diizinkan, klik tombol 'Izinkan Suara'");
-          return;
-        }
-        if (!backsoundAudio) {
-          backsoundAudio = new Audio("backsound.mpeg");
-          backsoundAudio.preload = "auto";
-        }
-        try {
-          // Reset dan putar
-          backsoundAudio.currentTime = 0;
-          await backsoundAudio.play();
-          console.log("🔊 Backsound diputar");
-        } catch (err) {
-          console.warn("Gagal putar backsound, mungkin butuh interaksi:", err);
-          // Jika gagal karena not allowed, tampilkan tombol lagi
-          if (err.name === "NotAllowedError") {
-            audioAllowed = false;
-            const btnExist = document.getElementById("allowSoundBtn");
-            if (!btnExist) {
-              const toolbar = document.querySelector(".toolbar-area");
-              const btn = document.createElement("button");
-              btn.id = "allowSoundBtn";
-              btn.className = "btn-allow-sound";
-              btn.innerHTML = "🔊 Izinkan Suara (Agar Backsound Berbunyi)";
-              btn.onclick = () => { enableAudioOnInteraction(); putarBacksound(); };
-              toolbar.appendChild(btn);
-            }
-          }
-        }
-      }
-
-      // ====================== SUARA PANGGILAN ======================
+      // ====================== SUARA & BACKSOUND ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if (suaraPerempuan) { resolve(suaraPerempuan); return; }
@@ -352,8 +266,14 @@
         speechSynthesis.speak(speech);
       }
 
+      function putarBacksound() {
+        const audio = new Audio("backsound.mpeg");
+        audio.play().catch(e => console.warn("Gagal putar backsound:", e));
+        console.log("🔊 Backsound diputar (sekali)");
+      }
+
       async function panggilSekali(nomor, nama, wbp) {
-        await putarBacksound();
+        putarBacksound();
         await new Promise(resolve => setTimeout(resolve, 3000));
         await playSuara(nomor, nama, wbp);
       }
@@ -374,7 +294,7 @@
         processQueue();
       }
 
-      // ====================== PERINTAH PANGGILAN ULANG (SEMUA DEVICE) ======================
+      // ====================== SINKRONISASI PERINTAH PANGGILAN ULANG (SEMUA DEVICE) ======================
       async function kirimPerintahPanggilan(nomor, nama, wbp) {
         try {
           await addDoc(perintahPanggilanRef, {
@@ -383,22 +303,25 @@
             wbp: wbp,
             createdAt: serverTimestamp(),
           });
-          console.log(`📡 Perintah panggilan ulang dikirim: ${nomor} - ${nama}`);
+          console.log(`📡 Perintah panggilan ulang dikirim ke semua device: ${nomor} - ${nama}`);
         } catch (err) {
           console.error("Gagal mengirim perintah panggilan:", err);
         }
       }
 
+      // Fungsi untuk mengeksekusi perintah dari Firestore
       async function eksekusiPerintahPanggilan(docSnap) {
         const data = docSnap.data();
         const { nomor, nama, wbp } = data;
         if (nomor && nama && wbp) {
           addToQueue(panggilSekali, nomor, nama, wbp);
-          console.log(`📢 Eksekusi panggilan ulang (semua device): ${nomor} - ${nama}`);
+          console.log(`📢 Eksekusi panggilan ulang: ${nomor} - ${nama} -> ${wbp}`);
         }
+        // Hapus perintah setelah diproses agar tidak menumpuk
         await deleteDoc(doc(db, "perintah_panggilan", docSnap.id));
       }
 
+      // Listener realtime untuk perintah panggilan (semua device akan mendengar)
       let isProcessingCommand = false;
       onSnapshot(perintahPanggilanRef, async (snapshot) => {
         if (isProcessingCommand) return;
@@ -410,7 +333,7 @@
             }
           }
         } catch (err) {
-          console.error("Error memproses perintah:", err);
+          console.error("Error memproses perintah panggilan:", err);
         } finally {
           isProcessingCommand = false;
         }
@@ -439,8 +362,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL (URUTAN TERBARU DI ATAS = createdAt DESC) ======================
-      function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
+      // ====================== RENDER TABEL (urutan terbaru di atas) ======================
       function jsEscape(str) {
         if (!str) return '';
         return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -449,29 +371,28 @@
       let renderRequestId = null;
       async function renderTabel() {
         if (!isOffsetReady) {
-          document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
+          document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...<\/td><\/tr>';
           return;
         }
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
-        // URUTKAN BERDASARKAN CREATEDAT (WAKTU INPUT) DESCENDING => PALING BARU DI ATAS
-        const sortedData = [...daftarData].sort((a, b) => {
-          const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
-          const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
-          return timeB - timeA;
-        });
+        // Urutkan dari nomor terbesar ke terkecil => antrian terbaru di paling atas
+        const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
         
         for (const item of sortedData) {
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
-          // Panggil otomatis saat selesai
+          // Otomatis panggil saat selesai (tetap dipertahankan)
           if (status.selesai && !item.sudahDipanggil) {
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
-            } catch (err) { console.error("Gagal update sudahDipanggil:", err); }
+            } catch (err) { 
+              console.error("Gagal update sudahDipanggil:", err);
+              if (err.code === 'already-exists') continue;
+            }
             addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
             tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
@@ -482,35 +403,41 @@
           
           tbody.innerHTML += `
             <tr>
-              <td>${escapeHtml(String(safeNomor))}</td>
-              <td>${escapeHtml(item.nama)}</td>
-              <td>${escapeHtml(item.wbp)}</td>
-              <td><span class="${status.class}">${status.text}</span></td>
+              <td>${escapeHtml(String(safeNomor))}<\/td>
+              <td>${escapeHtml(item.nama)}<\/td>
+              <td>${escapeHtml(item.wbp)}<\/td>
+              <td><span class="${status.class}">${status.text}</span><\/td>
               <td>
                 <div class="aksi-container">
-                  <button class="btn-ulang-panggilan" onclick="window.ulangiPanggilanRow('${safeNomor}', '${safeNama}', '${safeWbp}')">🔁 Ulang Panggilan</button>
-                  <button class="btn-hapus-satu" onclick="window.hapusData('${item.id}')">🗑 Hapus</button>
-                </div>
-              </td>
-            </tr>
+                  <button class="btn-ulang-panggilan" onclick="ulangiPanggilanRow('${safeNomor}', '${safeNama}', '${safeWbp}')">🔁 Ulang Panggilan<\/button>
+                  <button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus<\/button>
+                <\/div>
+               <\/td>
+             <\/tr>
           `;
         }
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
         renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 100); });
       }
       
+      function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
+      
       function tampilNotif(judul, pesan, warna) {
         const box = document.getElementById("notifikasi");
-        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
+        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}<\/div>`;
         box.style.display = "block";
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
-      // ====================== ULANGI PANGGILAN (SEMUA DEVICE) ======================
+      // ====================== ULANGI PANGGILAN PER BARIS (KIRIM PERINTAH KE SEMUA DEVICE) ======================
       window.ulangiPanggilanRow = function(nomor, nama, wbp) {
-        if (!nomor || !nama || !wbp) return;
+        if (!nomor || !nama || !wbp) {
+          console.warn("Data tidak lengkap untuk mengulang panggilan");
+          return;
+        }
+        // Kirim perintah ke Firestore, semua device (termasuk pengirim) akan mendengar dan mengeksekusi
         kirimPerintahPanggilan(nomor, nama, wbp);
-        tampilNotif("📡 Perintah dikirim", `Panggilan ulang antrian ${nomor} akan diputar di SEMUA layar`, "#0f5c6e");
+        tampilNotif("📡 Perintah dikirim", `Panggilan ulang untuk antrian ${nomor} akan diputar di semua layar`, "#0f5c6e");
       };
 
       // ====================== HAPUS DATA ======================
@@ -527,13 +454,15 @@
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
+        // Tidak menampilkan notifikasi popup sesuai permintaan
+        console.log("Semua data dihapus, counter reset ke 0");
       };
       
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== FIRESTORE LISTENER (data antrian) ======================
+      // ====================== FIRESTORE LISTENER ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
@@ -545,19 +474,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        await preloadAudio(); // coba aktivasi autoplay diam-diam
-        
-        // Pasang listener tombol izin suara jika belum
-        const allowBtn = document.getElementById("allowSoundBtn");
-        if (allowBtn) {
-          allowBtn.onclick = () => {
-            enableAudioOnInteraction();
-            // coba putar backsound sekali untuk memastikan
-            putarBacksound();
-          };
-        }
-        
-        document.getElementById("refreshIndicator").innerHTML = "✅ Sinkron panggilan antar device | Urutan: data terbaru di atas | Klik 'Izinkan Suara' untuk backsound & panggilan";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Sinkron panggilan antar device | Klik Ulang Panggilan akan diputar di semua layar";
         renderTabel();
       };
     </script>
