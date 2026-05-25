@@ -22,7 +22,6 @@
         border-radius: 2rem;
         padding: 25px 30px 35px;
         box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
-        transition: all 0.3s;
       }
       .main-container.fullscreen {
         position: fixed;
@@ -84,7 +83,7 @@
         position: sticky;
         top: 0;
       }
-      td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; transition: background 0.2s; }
+      td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
       .merah {
         background: #fee2e2;
         color: #dc2626;
@@ -98,15 +97,6 @@
         border-radius: 40px;
         padding: 4px 12px;
         display: inline-block;
-      }
-      .baris-selesai {
-        background-color: #ffdddd !important;
-        animation: blinkWarning 1s ease-in-out 3;
-      }
-      @keyframes blinkWarning {
-        0% { background-color: #ffdddd; }
-        50% { background-color: #ffaaaa; }
-        100% { background-color: #ffdddd; }
       }
       .btn-hapus-satu {
         background: #b91c1c;
@@ -126,33 +116,9 @@
         font-weight: bold;
         z-index: 999;
       }
-      /* TOAST NOTIFICATION */
-      .toast-notif {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #b91c1c;
-        color: white;
-        padding: 16px 24px;
-        border-radius: 60px;
-        font-weight: bold;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        animation: slideIn 0.3s ease-out;
-        max-width: 400px;
-        pointer-events: none;
-      }
-      @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
       @media (max-width: 700px) {
         .logo-left img, .logo-right img { height: 60px; }
         button { padding: 8px 16px; font-size: 0.8rem; }
-        .toast-notif { font-size: 0.85rem; padding: 12px 18px; right: 10px; left: 10px; max-width: none; }
       }
     </style>
   </head>
@@ -180,11 +146,12 @@
       </div>
       <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
     </div>
+    <div id="notifikasi" style="display: none"></div>
     <div class="auto-refresh-badge" id="refreshIndicator"></div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, runTransaction, Timestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -208,13 +175,9 @@
       let isOffsetReady = false;
 
       // Untuk sinkronisasi "Ulangi Panggilan" antar device
-      let lastRepeatTimestamp = 0;
+      let lastRepeatTimestamp = 0;   // menyimpan timestamp (dalam ms) terakhir yang sudah diproses oleh device ini
       const repeatCallDocRef = doc(db, "global", "repeatCall");
 
-      // NOTIFIKASI WAKTU HABIS (SELESAI)
-      let notifiedCompletedIds = new Set();  // menyimpan id antrian yang sudah dinotifikasi SELESAI
-      let audioCtx = null;                   // untuk beep suara
-      
       // ====================== KALIBRASI SERVER TIME ======================
       async function calibrateServerTime() {
         const savedOffset = localStorage.getItem("serverTimeOffset");
@@ -251,9 +214,9 @@
         console.log("🔄 Kalibrasi selesai, offset median:", serverTimeOffset, "ms");
       }
       function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-      setInterval(async () => { if (isOffsetReady) { await calibrateServerTime(); cekDanNotifikasiSelesai(); renderTabel(); } }, 30000);
+      setInterval(async () => { if (isOffsetReady) { await calibrateServerTime(); renderTabel(); } }, 30000);
 
-      // ====================== SUARA UMUM ======================
+      // ====================== SUARA & BACKSOUND ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if (suaraPerempuan) { resolve(suaraPerempuan); return; }
@@ -271,111 +234,45 @@
         });
       }
 
-      // Fungsi untuk memainkan beep pendek (pakai Web Audio)
-      async function playBeep() {
-        try {
-          if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          }
-          // Jika audio context suspended, coba resume (bisa gagal tanpa interaksi user, tapi speech tetap jalan)
-          if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-          }
-          const oscillator = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          oscillator.connect(gain);
-          gain.connect(audioCtx.destination);
-          oscillator.type = 'sine';
-          oscillator.frequency.value = 880;
-          gain.gain.value = 0.3;
-          oscillator.start();
-          gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.6);
-          oscillator.stop(audioCtx.currentTime + 0.6);
-        } catch (err) {
-          console.warn("Beep tidak bisa diputar (mungkin perlu interaksi user):", err);
-        }
-      }
-
-      // Pengumuman lisan khusus untuk waktu habis
-      async function speakCompletion(nomor, nama, wbp) {
-        const teks = `Perhatian. Waktu kunjungan untuk antrian nomor ${nomor}, pengunjung atas nama ${nama}, kunjungan untuk saudara ${wbp} telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
+      async function playSuara(nomor, nama, wbp) {
+        const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama}, kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
         speech.lang = "id-ID";
         speech.rate = 0.9;
-        speech.pitch = 1.1;
+        speech.pitch = 1.15;
         speech.voice = await getSuaraPerempuan();
         speechSynthesis.speak(speech);
       }
 
-      // NOTIFIKASI VISUAL (toast + highlight baris)
-      function showVisualNotification(nomor, nama, wbp, rowElement) {
-        // Toast muncul
-        const toast = document.createElement('div');
-        toast.className = 'toast-notif';
-        toast.innerHTML = `⏰ WAKTU HABIS! Antrian ${nomor} | ${nama} → ${wbp}`;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 5000);
-        
-        // Highlight baris
-        if (rowElement) {
-          rowElement.classList.add('baris-selesai');
-          setTimeout(() => rowElement.classList.remove('baris-selesai'), 4000);
-        }
+      function putarBacksound() {
+        const audio = new Audio("backsound.mpeg");
+        audio.play().catch(e => console.warn("Gagal putar backsound:", e));
+        console.log("🔊 Backsound diputar (sekali)");
       }
 
-      // TRIGGER NOTIFIKASI LENGKAP (suara+beep+visual)
-      async function triggerCompletionNotification(item, rowElement) {
-        const nomor = item.nomor || '?';
-        const nama = item.nama || 'pengunjung';
-        const wbp = item.wbp || 'WBP';
-        
-        // Visual
-        showVisualNotification(nomor, nama, wbp, rowElement);
-        // Suara beep
-        await playBeep();
-        // Pengumuman lisan
-        await speakCompletion(nomor, nama, wbp);
+      async function panggilSekali(nomor, nama, wbp) {
+        putarBacksound();
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await playSuara(nomor, nama, wbp);
       }
 
-      // ====================== CEK DAN NOTIFIKASI STATUS SELESAI ======================
-      let notifInterval = null;
-      function cekDanNotifikasiSelesai() {
-        if (!isOffsetReady) return;
-        const tbody = document.getElementById("tabelData");
-        const rows = tbody.querySelectorAll("tr");
-        // Buat map id ke row element
-        const rowMap = new Map();
-        rows.forEach(row => {
-          const idAttr = row.getAttribute("data-id");
-          if (idAttr) rowMap.set(idAttr, row);
-        });
-        
-        for (const item of daftarData) {
-          const status = hitungStatus(item);
-          const isSelesai = (status.text === "✔️ SELESAI");
-          
-          if (isSelesai && !notifiedCompletedIds.has(item.id)) {
-            // Belum pernah dinotifikasi -> kirim notifikasi sekarang
-            notifiedCompletedIds.add(item.id);
-            const rowEl = rowMap.get(item.id);
-            triggerCompletionNotification(item, rowEl).catch(e => console.warn("Notif error:", e));
-          } else if (!isSelesai && notifiedCompletedIds.has(item.id)) {
-            // Jika status berubah dari selesai jadi belum selesai (misal edit durasi) -> reset notif
-            notifiedCompletedIds.delete(item.id);
-          }
+      // ====================== QUEUE (ANTRIAN PANGGILAN) ======================
+      async function processQueue() {
+        if (isProcessingQueue) return;
+        isProcessingQueue = true;
+        while (callQueue.length > 0) {
+          const task = callQueue.shift();
+          try { await task(); } catch (err) { console.error(err); }
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
-        
-        // Bersihkan jika data dihapus
-        const currentIds = new Set(daftarData.map(d => d.id));
-        for (let id of notifiedCompletedIds) {
-          if (!currentIds.has(id)) notifiedCompletedIds.delete(id);
-        }
+        isProcessingQueue = false;
+      }
+      function addToQueue(fn, ...args) {
+        callQueue.push(() => fn(...args));
+        processQueue();
       }
 
-      // Jalankan pengecekan tiap 2 detik
-      setInterval(() => { cekDanNotifikasiSelesai(); }, 2000);
-
-      // Fungsi status dengan perhitungan detail
+      // ====================== STATUS TIMER ======================
       function hitungStatus(item) {
         if (!item.createdAt || typeof item.createdAt.toDate !== 'function') return { text: "⏳ Memuat...", class: "hijau" };
         const serverCreated = item.createdAt.toDate().getTime();
@@ -393,9 +290,7 @@
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa / 60);
           const detik = Math.floor(sisa % 60);
-          let textClass = "";
-          if (sisa <= 10) textClass = "merah";
-          return { text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, class: textClass };
+          return { text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, class: sisa <= 10 ? "merah" : "" };
         }
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
@@ -415,40 +310,42 @@
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
-          const row = tbody.insertRow();
-          row.setAttribute("data-id", item.id);
-          row.insertCell(0).innerText = nomorAntrian;
-          row.insertCell(1).innerText = escapeHtml(item.nama);
-          row.insertCell(2).innerText = escapeHtml(item.wbp);
-          const statusCell = row.insertCell(3);
-          statusCell.innerHTML = `<span class="${status.class}">${status.text}</span>`;
-          const actionCell = row.insertCell(4);
-          const hapusBtn = document.createElement("button");
-          hapusBtn.innerText = "🗑 Hapus";
-          hapusBtn.className = "btn-hapus-satu";
-          hapusBtn.onclick = (function(id) { return function() { hapusData(id); }; })(item.id);
-          actionCell.appendChild(hapusBtn);
-          
-          // Jika status selesai dan belum ter-notifikasi, tapi baru saja di-render (case add dari device lain)
-          if (status.text === "✔️ SELESAI" && !notifiedCompletedIds.has(item.id)) {
-            // Langsung notifikasi tanpa delay (tapi tidak double karena cek akan handle juga)
-            // Tambahkan ke set agar tidak double trigger di interval berikutnya
-            notifiedCompletedIds.add(item.id);
-            triggerCompletionNotification(item, row).catch(e => console.warn(e));
+          if (status.selesai && !item.sudahDipanggil) {
+            try {
+              await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
+              item.sudahDipanggil = true;
+            } catch (err) { 
+              console.error("Gagal update sudahDipanggil:", err);
+            }
+            panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
+            addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
           }
+          tbody.innerHTML += `
+            <tr>
+              <td>${nomorAntrian}</td>
+              <td>${escapeHtml(item.nama)}</td>
+              <td>${escapeHtml(item.wbp)}</td>
+              <td><span class="${status.class}">${status.text}</span></td>
+              <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
+            </tr>
+          `;
         }
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
-        renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 500); });
+        renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 100); });
       }
-      
       function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
+      function tampilNotif(judul, pesan, warna) {
+        // Notifikasi internal (bisa digunakan untuk keperluan lain tapi tidak untuk hapus semua)
+        const box = document.getElementById("notifikasi");
+        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
+        box.style.display = "block";
+        setTimeout(() => { box.style.display = "none"; }, 4000);
+      }
 
       // ====================== HAPUS DATA ======================
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
-        // Hapus dari set notifikasi jika ada
-        notifiedCompletedIds.delete(id);
       };
       
       window.hapusSemuaData = async function () {
@@ -459,48 +356,19 @@
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        notifiedCompletedIds.clear();
+        // NOTIFIKASI DIHAPUS - tidak menampilkan apapun
+        // Hanya kosongkan agar tidak muncul popup
       };
 
-      // ====================== ULANGI PANGGILAN (MANUAL) ======================
-      async function playSuaraManual(nomor, nama, wbp) {
-        const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama}, kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
-        const speech = new SpeechSynthesisUtterance(teks);
-        speech.lang = "id-ID";
-        speech.rate = 0.9;
-        speech.pitch = 1.15;
-        speech.voice = await getSuaraPerempuan();
-        speechSynthesis.speak(speech);
-      }
-      function putarBacksound() {
-        const audio = new Audio("backsound.mpeg");
-        audio.play().catch(e => console.warn("Gagal putar backsound:", e));
-      }
-      async function panggilSekaliManual(nomor, nama, wbp) {
-        putarBacksound();
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        await playSuaraManual(nomor, nama, wbp);
-      }
-      function addToQueue(fn, ...args) {
-        callQueue.push(() => fn(...args));
-        processQueue();
-      }
-      async function processQueue() {
-        if (isProcessingQueue) return;
-        isProcessingQueue = true;
-        while (callQueue.length > 0) {
-          const task = callQueue.shift();
-          try { await task(); } catch (err) { console.error(err); }
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        isProcessingQueue = false;
-      }
-      
+      // ====================== ULANGI PANGGILAN (SINKRON SEMUA DEVICE) ======================
+      // Fungsi untuk mengirim perintah ulang panggilan ke Firestore
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
+          // Tidak ada panggilan terakhir, beri tahu user lewat console atau tidak usah notif
           console.warn("Tidak ada panggilan terakhir untuk diulang.");
           return;
         }
+        // Simpan data ke Firestore dengan timestamp server
         const nowServer = Timestamp.now();
         await setDoc(repeatCallDocRef, {
           nomor: panggilanTerakhir.nomor,
@@ -512,21 +380,24 @@
         console.log("Perintah ulang panggilan dikirim ke Firestore");
       };
 
+      // Mendengarkan perubahan pada dokumen repeatCall (sinkronisasi antar device)
       function listenRepeatCall() {
         onSnapshot(repeatCallDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             const newTimestamp = data.timestamp?.toDate?.()?.getTime() || 0;
-            const now = Date.now();
-            if (newTimestamp > lastRepeatTimestamp && (now - newTimestamp) < 10000) {
+            // Jika timestamp lebih baru dari yang terakhir diproses oleh device ini
+            if (newTimestamp > lastRepeatTimestamp && newTimestamp !== 0) {
               lastRepeatTimestamp = newTimestamp;
               const { nomor, nama, wbp } = data;
               if (nomor && nama && wbp) {
-                console.log(`📢 Menerima perintah ulang panggilan: nomor ${nomor}`);
-                addToQueue(panggilSekaliManual, nomor, nama, wbp);
+                console.log(`📢 Menerima perintah ulang panggilan dari device lain: nomor ${nomor}`);
+                addToQueue(panggilSekali, nomor, nama, wbp);
               }
             }
           }
+        }, (error) => {
+          console.error("Gagal mendengarkan repeatCall:", error);
         });
       }
 
@@ -540,39 +411,18 @@
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
         daftarData = newData;
-        if (newData.length > 0) {
-          const maxNomor = Math.max(...newData.map(d => d.nomor || 0));
-          const lastItem = newData.find(d => d.nomor === maxNomor);
-          if (lastItem) {
-            panggilanTerakhir = { nomor: lastItem.nomor, nama: lastItem.nama, wbp: lastItem.wbp };
-          }
-        } else {
-          panggilanTerakhir = null;
-        }
         renderTabel();
-        cekDanNotifikasiSelesai(); // langsung cek notifikasi saat ada perubahan data
       });
 
       // ====================== INIT ======================
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        lastRepeatTimestamp = Date.now();
-        document.getElementById("refreshIndicator").innerHTML = "🔄 Realtime + Notifikasi waktu habis (visual, beep, suara)";
+        // Ubah teks indicator refresh (hilangkan teks backsound)
+        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | Semua device terhubung";
+        // Mulai mendengarkan perintah ulang panggilan
         listenRepeatCall();
         renderTabel();
-        // Inisialisasi AudioContext untuk beep (belum di-resume, tetapi nanti coba resume ketika notifikasi)
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // Event listener untuk mengaktifkan audio setelah user klik pertama di mana saja (agar beep bisa jalan)
-        const resumeAudio = () => {
-          if (audioCtx && audioCtx.state === 'suspended') {
-            audioCtx.resume().then(() => console.log("AudioContext aktif setelah user gesture"));
-          }
-          document.removeEventListener('click', resumeAudio);
-          document.removeEventListener('touchstart', resumeAudio);
-        };
-        document.addEventListener('click', resumeAudio);
-        document.addEventListener('touchstart', resumeAudio);
       };
     </script>
   </body>
