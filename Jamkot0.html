@@ -349,14 +349,14 @@
         await deleteDoc(doc(db, "antrian", id));
       };
       window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0, antrian berikutnya mulai dari nomor 1")) return;
+        if (!confirm("⚠️ Hapus SEMUA antrian?")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        tampilNotif("🗑️ SEMUA DATA TERHAPUS & COUNTER DI RESET", "Antrian berikutnya mulai nomor 1", "#1e466e");
+        tampilNotif("🗑️ SEMUA DATA TERHAPUS", "#1e466e");
       };
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) { alert("Belum ada panggilan selesai."); return; }
