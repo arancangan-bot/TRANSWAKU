@@ -1,12 +1,3 @@
-Berikut adalah kode final yang memastikan **backsound dan suara panggilan** diputar di **SEMUA device** yang mengakses Jamkot0 ketika tombol "Ulangi Panggilan" ditekan di salah satu device.
-
-**Perbaikan utama:**
-- Menggunakan mekanisme **broadcast via Firestore** dengan dokumen perintah yang **tidak langsung dihapus**, sehingga semua device punya waktu untuk membaca dan mengeksekusi.
-- Setiap perintah memiliki `createdAt` (server timestamp). Perintah yang sudah berumur > 30 detik akan **dihapus otomatis** oleh proses pembersihan berkala agar database tidak penuh.
-- Setiap device **menyimpan ID perintah yang sudah dieksekusi** di `localStorage` untuk mencegah eksekusi ganda pada perangkat yang sama (jika koneksi tidak stabil dan snapshot terpicu ulang).
-- **Backsound diputar persis seperti yang diinginkan** (sekali per panggilan, lalu jeda 3 detik, lalu suara).
-
-```html
 <!doctype html>
 <html lang="id">
   <head>
@@ -210,10 +201,8 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
       const executedCommandsKey = "executed_commands";
       let executedCommands = new Set(JSON.parse(localStorage.getItem(executedCommandsKey) || "[]"));
       
-      // Simpan ID perintah yang sudah dieksekusi ke localStorage
       function markCommandExecuted(commandId) {
         executedCommands.add(commandId);
-        // Simpan maksimal 100 ID terakhir agar tidak membesar
         const arr = Array.from(executedCommands).slice(-100);
         localStorage.setItem(executedCommandsKey, JSON.stringify(arr));
       }
@@ -316,7 +305,7 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         processQueue();
       }
 
-      // ====================== BROADCAST PANGGILAN ULANG (SEMUA DEVICE) ======================
+      // ====================== BROADCAST PANGGILAN ULANG ======================
       async function kirimPerintahPanggilan(nomor, nama, wbp) {
         try {
           await addDoc(collection(db, "perintah_panggilan"), {
@@ -331,7 +320,6 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         }
       }
 
-      // Eksekusi perintah (hanya jika belum pernah dieksekusi oleh device ini)
       async function eksekusiPerintah(commandDoc) {
         const data = commandDoc.data();
         const commandId = commandDoc.id;
@@ -347,9 +335,8 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         }
       }
 
-      // Membersihkan perintah yang sudah lebih dari 30 detik (agar database tidak penuh)
       async function bersihkanPerintahLama() {
-        const batasWaktu = new Date(Date.now() - 30000); // 30 detik yang lalu
+        const batasWaktu = new Date(Date.now() - 30000);
         try {
           const q = query(collection(db, "perintah_panggilan"), where("createdAt", "<=", batasWaktu));
           const snapshot = await getDocs(q);
@@ -362,14 +349,11 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         }
       }
 
-      // Listener perintah baru (hanya untuk perintah yang umurnya kurang dari 30 detik)
-      // Kita gunakan query dengan orderBy createdAt descending, dan batasi 50 terbaru
       const perintahQuery = query(collection(db, "perintah_panggilan"), orderBy("createdAt", "desc"), limit(50));
       onSnapshot(perintahQuery, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === "added") {
             const docData = change.doc.data();
-            // Jangan eksekusi perintah yang sudah terlalu tua (lebih dari 30 detik)
             if (docData.createdAt) {
               const docTime = docData.createdAt.toDate().getTime();
               const now = Date.now();
@@ -383,7 +367,6 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         });
       });
 
-      // Pembersihan periodik setiap 60 detik
       setInterval(() => {
         bersihkanPerintahLama();
       }, 60000);
@@ -411,7 +394,7 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL (urutan terbaru di atas) ======================
+      // ====================== RENDER TABEL ======================
       function jsEscape(str) {
         if (!str) return '';
         return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -425,15 +408,20 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         }
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
-        // Urutkan dari nomor terbesar ke terkecil => antrian terbaru di paling atas
-        const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
+        
+        // URUTAN BERDASARKAN WAKTU INPUT TERBARU (createdAt descending)
+        // Yang terakhir input berada di paling atas
+        const sortedData = [...daftarData].sort((a, b) => {
+          const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
+          const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
+          return timeB - timeA;
+        });
         
         for (const item of sortedData) {
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
-          // Otomatis panggil saat selesai (tetap dipertahankan)
           if (status.selesai && !item.sudahDipanggil) {
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
@@ -478,13 +466,12 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
-      // ====================== ULANGI PANGGILAN PER BARIS (KIRIM PERINTAH KE SEMUA DEVICE) ======================
+      // ====================== ULANGI PANGGILAN ======================
       window.ulangiPanggilanRow = function(nomor, nama, wbp) {
         if (!nomor || !nama || !wbp) {
           console.warn("Data tidak lengkap untuk mengulang panggilan");
           return;
         }
-        // Kirim perintah ke Firestore, semua device akan mendengar dan mengeksekusi (termasuk pengirim)
         kirimPerintahPanggilan(nomor, nama, wbp);
         tampilNotif("📡 Perintah dikirim", `Panggilan ulang untuk antrian ${nomor} akan diputar di semua layar`, "#0f5c6e");
       };
@@ -503,7 +490,7 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // Tidak ada notifikasi popup sesuai permintaan
+        // Tidak menampilkan notifikasi popup
         console.log("Semua data dihapus, counter reset ke 0");
       };
       
@@ -511,7 +498,7 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== FIRESTORE LISTENER UNTUK DATA ANTRIAN ======================
+      // ====================== LISTENER DATA ANTRIAN ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
@@ -523,8 +510,7 @@ Berikut adalah kode final yang memastikan **backsound dan suara panggilan** dipu
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Sinkron panggilan antar device | Klik 'Ulang Panggilan' akan diputar di semua layar (backsound + suara)";
-        // Bersihkan perintah lama saat startup
+        document.getElementById("refreshIndicator").innerHTML = "✅ Urutan: terakhir input di atas | Klik 'Ulang Panggilan' diputar di semua layar (backsound+suara)";
         bersihkanPerintahLama();
         renderTabel();
       };
