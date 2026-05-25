@@ -201,8 +201,10 @@
       const executedCommandsKey = "executed_commands";
       let executedCommands = new Set(JSON.parse(localStorage.getItem(executedCommandsKey) || "[]"));
       
+      // Simpan ID perintah yang sudah dieksekusi ke localStorage
       function markCommandExecuted(commandId) {
         executedCommands.add(commandId);
+        // Simpan maksimal 100 ID terakhir agar tidak membesar
         const arr = Array.from(executedCommands).slice(-100);
         localStorage.setItem(executedCommandsKey, JSON.stringify(arr));
       }
@@ -305,7 +307,7 @@
         processQueue();
       }
 
-      // ====================== BROADCAST PANGGILAN ULANG ======================
+      // ====================== BROADCAST PANGGILAN ULANG (SEMUA DEVICE) ======================
       async function kirimPerintahPanggilan(nomor, nama, wbp) {
         try {
           await addDoc(collection(db, "perintah_panggilan"), {
@@ -320,6 +322,7 @@
         }
       }
 
+      // Eksekusi perintah (hanya jika belum pernah dieksekusi oleh device ini)
       async function eksekusiPerintah(commandDoc) {
         const data = commandDoc.data();
         const commandId = commandDoc.id;
@@ -335,8 +338,9 @@
         }
       }
 
+      // Membersihkan perintah yang sudah lebih dari 30 detik (agar database tidak penuh)
       async function bersihkanPerintahLama() {
-        const batasWaktu = new Date(Date.now() - 30000);
+        const batasWaktu = new Date(Date.now() - 30000); // 30 detik yang lalu
         try {
           const q = query(collection(db, "perintah_panggilan"), where("createdAt", "<=", batasWaktu));
           const snapshot = await getDocs(q);
@@ -349,11 +353,14 @@
         }
       }
 
+      // Listener perintah baru (hanya untuk perintah yang umurnya kurang dari 30 detik)
+      // Kita gunakan query dengan orderBy createdAt descending, dan batasi 50 terbaru
       const perintahQuery = query(collection(db, "perintah_panggilan"), orderBy("createdAt", "desc"), limit(50));
       onSnapshot(perintahQuery, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === "added") {
             const docData = change.doc.data();
+            // Jangan eksekusi perintah yang sudah terlalu tua (lebih dari 30 detik)
             if (docData.createdAt) {
               const docTime = docData.createdAt.toDate().getTime();
               const now = Date.now();
@@ -367,6 +374,7 @@
         });
       });
 
+      // Pembersihan periodik setiap 60 detik
       setInterval(() => {
         bersihkanPerintahLama();
       }, 60000);
@@ -394,7 +402,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL ======================
+      // ====================== RENDER TABEL (urutan terbaru di atas) ======================
       function jsEscape(str) {
         if (!str) return '';
         return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -408,20 +416,15 @@
         }
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
-        
-        // URUTAN BERDASARKAN WAKTU INPUT TERBARU (createdAt descending)
-        // Yang terakhir input berada di paling atas
-        const sortedData = [...daftarData].sort((a, b) => {
-          const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
-          const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
-          return timeB - timeA;
-        });
+        // Urutkan dari nomor terbesar ke terkecil => antrian terbaru di paling atas
+        const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
         
         for (const item of sortedData) {
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
+          // Otomatis panggil saat selesai (tetap dipertahankan)
           if (status.selesai && !item.sudahDipanggil) {
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
@@ -466,12 +469,13 @@
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
-      // ====================== ULANGI PANGGILAN ======================
+      // ====================== ULANGI PANGGILAN PER BARIS (KIRIM PERINTAH KE SEMUA DEVICE) ======================
       window.ulangiPanggilanRow = function(nomor, nama, wbp) {
         if (!nomor || !nama || !wbp) {
           console.warn("Data tidak lengkap untuk mengulang panggilan");
           return;
         }
+        // Kirim perintah ke Firestore, semua device akan mendengar dan mengeksekusi (termasuk pengirim)
         kirimPerintahPanggilan(nomor, nama, wbp);
         tampilNotif("📡 Perintah dikirim", `Panggilan ulang untuk antrian ${nomor} akan diputar di semua layar`, "#0f5c6e");
       };
@@ -490,7 +494,7 @@
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // Tidak menampilkan notifikasi popup
+        // Tidak ada notifikasi popup sesuai permintaan
         console.log("Semua data dihapus, counter reset ke 0");
       };
       
@@ -498,7 +502,7 @@
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== LISTENER DATA ANTRIAN ======================
+      // ====================== FIRESTORE LISTENER UNTUK DATA ANTRIAN ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
@@ -510,11 +514,11 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Urutan: terakhir input di atas | Klik 'Ulang Panggilan' diputar di semua layar (backsound+suara)";
+        document.getElementById("refreshIndicator").innerHTML = "✅ Sinkron panggilan antar device | Klik 'Ulang Panggilan' akan diputar di semua layar (backsound + suara)";
+        // Bersihkan perintah lama saat startup
         bersihkanPerintahLama();
         renderTabel();
       };
     </script>
   </body>
 </html>
-```
