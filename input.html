@@ -3,180 +3,140 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-    <title>Jamkot | Dashboard Antrian - Lapas Cikarang</title>
+    <title>Jamkot | Input Antrian - Lapas Cikarang</title>
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
       body {
-        font-family: "Segoe UI", system-ui;
+        font-family: "Segoe UI", "Poppins", system-ui;
         min-height: 100vh;
         padding: 30px 20px;
         background-image: url("background.png");
         background-size: cover;
         background-position: center;
-        background-color: #1e3c4a;
-      }
-      .main-container {
-        max-width: 1300px;
-        margin: 0 auto;
-        background: rgba(255, 255, 255, 0.94);
-        border-radius: 2rem;
-        padding: 25px 30px 35px;
-        box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
-        transition: all 0.3s;
-      }
-      .main-container.fullscreen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 0;
-        overflow-y: auto;
-        z-index: 9999;
-      }
-      .header-wrapper {
+        background-color: #0f2c38;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        border-bottom: 4px solid #facc15;
-      }
-      .logo-left, .logo-right { padding: 8px 16px; }
-      .judul-utama { text-align: center; flex: 1; }
-      .judul-utama h2 { text-shadow: 2px 2px 5px black; color: #ffe484; }
-      .logo-left img, .logo-right img { height: 90px; object-fit: contain; }
-      .toolbar-area {
-        display: flex;
-        flex-wrap: wrap;
         justify-content: center;
+        align-items: center;
+      }
+      .card-input {
+        max-width: 550px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.96);
+        border-radius: 2rem;
+        padding: 2rem;
+        box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
+      }
+      .logo-area {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .logo-area img {
+        height: 70px;
+        margin: 0 5px;
+      }
+      .judul {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .judul h2 {
+        color: #1e3c4a;
+        border-left: 6px solid #facc15;
+        display: inline-block;
+        padding: 0 20px;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      .form-group label {
+        font-weight: 700;
+        display: block;
+        margin-bottom: 8px;
+        color: #0f2c38;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 14px 18px;
+        border: 2px solid #e2e8f0;
+        border-radius: 60px;
+        font-size: 1rem;
+      }
+      .form-group input:focus {
+        border-color: #2a7f62;
+        outline: none;
+      }
+      .btn-group {
+        display: flex;
         gap: 15px;
-        margin: 25px 0 20px;
+        margin-top: 20px;
       }
       button {
-        padding: 12px 28px;
-        border-radius: 40px;
-        font-weight: 600;
+        flex: 1;
+        padding: 12px;
+        border-radius: 60px;
+        font-weight: 700;
         border: none;
-        background: #1e466e;
-        color: white;
         cursor: pointer;
         transition: 0.2s;
       }
-      button:hover { transform: translateY(-2px); filter: brightness(1.05); }
-      .btn-input-page { background: #2a7f62; }
-      .btn-repeat-last { background: #2d5f3e; }
-      .btn-fullscreen { background: #6b21a5; }
-      .table-wrapper {
-        overflow-x: auto;
-        max-height: 520px;
-        border: 1px solid #ccc;
-        border-radius: 1rem;
+      .btn-simpan {
+        background: #2a7f62;
+        color: white;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
+      .btn-back {
+        background: #475569;
+        color: white;
       }
-      th {
-        background: #1e3c4a;
+      button:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.05);
+      }
+      .info-antrian {
+        background: #f1f5f9;
+        border-radius: 2rem;
+        padding: 12px;
+        text-align: center;
+        margin-top: 20px;
+        font-weight: 600;
+      }
+      .notif-sukses {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: #0e7c32;
         color: white;
         padding: 14px;
-        position: sticky;
-        top: 0;
-      }
-      td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
-      .merah {
-        background: #fee2e2;
-        color: #dc2626;
-        border-radius: 40px;
-        padding: 4px 12px;
-        display: inline-block;
-      }
-      .hijau {
-        background: #dcfce7;
-        color: #0e7c32;
-        border-radius: 40px;
-        padding: 4px 12px;
-        display: inline-block;
-      }
-      .btn-hapus-satu {
-        background: #b91c1c;
-        padding: 6px 18px;
-        border-radius: 30px;
-      }
-      .hapus-semua-wrapper { text-align: center; margin-top: 20px; }
-      .auto-refresh-badge {
-        position: fixed;
-        bottom: 15px;
-        left: 15px;
-        background: rgba(0, 0, 0, 0.7);
-        color: #facc15;
-        padding: 6px 14px;
-        border-radius: 30px;
-        font-size: 0.8rem;
-        font-weight: bold;
-        z-index: 999;
-      }
-      /* Notifikasi visual (toast) */
-      .toast-notif {
-        position: fixed;
-        bottom: 30px;
-        right: 20px;
-        background: #facc15;
-        color: #1e3c4a;
-        padding: 12px 24px;
-        border-radius: 50px;
-        font-weight: bold;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        z-index: 10000;
-        animation: fadeInOut 4s ease forwards;
-        font-size: 1rem;
-        max-width: 340px;
-        border-left: 6px solid #b91c1c;
-      }
-      @keyframes fadeInOut {
-        0% { opacity: 0; transform: translateX(50px); }
-        10% { opacity: 1; transform: translateX(0); }
-        90% { opacity: 1; transform: translateX(0); }
-        100% { opacity: 0; transform: translateX(50px); visibility: hidden; }
-      }
-      @media (max-width: 700px) {
-        .logo-left img, .logo-right img { height: 60px; }
-        button { padding: 8px 16px; font-size: 0.8rem; }
-        .toast-notif { bottom: 20px; right: 10px; left: 10px; max-width: none; font-size: 0.9rem; }
+        border-radius: 60px;
+        text-align: center;
+        z-index: 1000;
+        max-width: 400px;
+        margin: 0 auto;
       }
     </style>
   </head>
   <body>
-    <div class="main-container" id="mainContainer">
-      <div class="header-wrapper">
-        <div class="logo-left"><img src="imipas.png" alt="Kemenimipas" onerror="this.style.display = 'none'" /></div>
-        <div class="judul-utama">
-          <h2>LAPAS KELAS IIA CIKARANG</h2>
-          <h2>JAM MONITORING KUNJUNGAN TERPADU</h2>
-          <h2>RANCANGAN AKTUALISASI RICKY MARTIN</h2>
-        </div>
-        <div class="logo-right"><img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display = 'none'" /></div>
+    <div class="card-input">
+      <div class="logo-area">
+        <img src="imipas.png" alt="Kemenimipas" onerror="this.style.display = 'none'" />
+        <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display = 'none'" />
       </div>
-      <div class="toolbar-area">
-        <button class="btn-input-page" onclick="window.location.href = 'input.html'">📝 Buka Halaman Input</button>
-        <button class="btn-repeat-last" onclick="ulangiPanggilanTerakhir()">🔁 Ulangi Panggilan Terakhir</button>
-        <button class="btn-fullscreen" onclick="toggleFullscreen()">🖥️ Full Layar</button>
+      <div class="judul">
+        <h2>📋 TAMBAH ANTRIAN</h2>
+        <p>Lapas Kelas IIA Cikarang</p>
       </div>
-      <div class="table-wrapper">
-        <table>
-          <thead><tr><th>No. Antrian</th><th>Nama Pengunjung</th><th>Nama WBP</th><th>Status / Waktu</th><th>Aksi</th></tr></thead>
-          <tbody id="tabelData"></tbody>
-        </table>
-      </div>
-      <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
+      <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="contoh: Budi Santoso" /></div>
+      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="contoh: Andi Wijaya" autocomplete="off" /></div>
+      <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
+      <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
     </div>
-    <div id="notifVisualContainer"></div>
-    <div class="auto-refresh-badge" id="refreshIndicator"></div>
-
+    <div id="notifTemp"></div>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, runTransaction, Timestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -190,272 +150,91 @@
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
-      // ====================== GLOBAL ======================
-      let daftarData = [];
-      let panggilanTerakhir = null;        // { nomor, nama, wbp }
-      let suaraPerempuan = null;
-      let callQueue = [];
-      let isProcessingQueue = false;
-      let serverTimeOffset = 0;
-      let isOffsetReady = false;
-      let lastRepeatTimestamp = 0;
-      const repeatCallDocRef = doc(db, "global", "repeatCall");
-
-      // ====================== KALIBRASI SERVER TIME ======================
-      async function calibrateServerTime() {
-        const savedOffset = localStorage.getItem("serverTimeOffset");
-        const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
-        if (savedOffset && savedTime && (Date.now() - parseInt(savedTime) < 5 * 60 * 1000)) {
-          serverTimeOffset = parseInt(savedOffset);
-          isOffsetReady = true;
-          console.log("✅ Pakai offset dari localStorage:", serverTimeOffset, "ms");
-          return;
-        }
-        const samples = [];
-        for (let i = 0; i < 5; i++) {
-          try {
-            const tempRef = doc(collection(db, "tempTime"));
-            const before = Date.now();
-            await setDoc(tempRef, { ping: serverTimestamp() });
-            const snap = await getDoc(tempRef);
-            const serverTime = snap.data().ping.toDate().getTime();
-            const after = Date.now();
-            const rtt = after - before;
-            const clientTime = before + rtt / 2;
-            const offset = serverTime - clientTime;
-            samples.push(offset);
-            await deleteDoc(tempRef);
-          } catch (e) { console.warn("Ping gagal", e); }
-          await new Promise(r => setTimeout(r, 100));
-        }
-        if (samples.length === 0) { serverTimeOffset = 0; isOffsetReady = true; return; }
-        samples.sort((a, b) => a - b);
-        serverTimeOffset = samples[Math.floor(samples.length / 2)];
-        localStorage.setItem("serverTimeOffset", serverTimeOffset);
-        localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
-        isOffsetReady = true;
-        console.log("🔄 Kalibrasi selesai, offset median:", serverTimeOffset, "ms");
-      }
-      function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-      setInterval(() => { if (isOffsetReady) calibrateServerTime(); }, 30000);
-
-      // ====================== NOTIFIKASI VISUAL ======================
-      function showVisualNotification(nomor, nama, wbp) {
-        const container = document.getElementById("notifVisualContainer");
-        const toast = document.createElement("div");
-        toast.className = "toast-notif";
-        toast.innerHTML = `🔔 <strong>Panggilan Ulang</strong><br>Antrian ${nomor} - ${nama} (WBP: ${wbp})`;
-        container.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
-      }
-
-      // ====================== SUARA & BACKSOUND ======================
-      async function getSuaraPerempuan() {
-        return new Promise((resolve) => {
-          if (suaraPerempuan) { resolve(suaraPerempuan); return; }
-          const cek = setInterval(() => {
-            const voices = speechSynthesis.getVoices();
-            if (voices.length) {
-              clearInterval(cek);
-              let preferred = voices.find(v => v.lang === "id-ID" && (v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("perempuan")));
-              if (!preferred) preferred = voices.find(v => v.lang === "id-ID");
-              if (!preferred) preferred = voices.find(v => v.lang.startsWith("id"));
-              suaraPerempuan = preferred || voices[0];
-              resolve(suaraPerempuan);
-            }
-          }, 100);
-        });
-      }
-
-      async function playSuara(nomor, nama, wbp) {
-        const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama}, kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
-        const speech = new SpeechSynthesisUtterance(teks);
-        speech.lang = "id-ID";
-        speech.rate = 0.9;
-        speech.pitch = 1.15;
-        speech.voice = await getSuaraPerempuan();
-        speechSynthesis.speak(speech);
-      }
-
-      function putarBacksound() {
-        const audio = new Audio("backsound.mpeg");
-        audio.play().catch(e => console.warn("Gagal putar backsound:", e));
-        console.log("🔊 Backsound diputar (sekali)");
-      }
-
-      async function panggilSekali(nomor, nama, wbp, showNotif = true) {
-        if (showNotif) showVisualNotification(nomor, nama, wbp);
-        putarBacksound();
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        await playSuara(nomor, nama, wbp);
-      }
-
-      // ====================== QUEUE PANGGILAN ======================
-      async function processQueue() {
-        if (isProcessingQueue) return;
-        isProcessingQueue = true;
-        while (callQueue.length > 0) {
-          const task = callQueue.shift();
-          try { await task(); } catch (err) { console.error(err); }
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        isProcessingQueue = false;
-      }
-      function addToQueue(fn, ...args) {
-        callQueue.push(() => fn(...args));
-        processQueue();
-      }
-
-      // ====================== STATUS TIMER ======================
-      function hitungStatus(item) {
-        if (!item.createdAt || typeof item.createdAt.toDate !== 'function') return { text: "⏳ Memuat...", class: "hijau" };
-        const serverCreated = item.createdAt.toDate().getTime();
-        const serverNow = getCurrentServerTime();
-        let elapsed = (serverNow - serverCreated) / 1000;
-        if (elapsed < 0) elapsed = 0;
-        const persiapan = item.durasiPersiapan || 10;
-        const kunjungan = item.durasiKunjungan || 15;
-        if (elapsed < persiapan) {
-          const sisa = persiapan - elapsed;
-          return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
-        }
-        const elapsedKunjungan = elapsed - persiapan;
-        if (elapsedKunjungan < kunjungan) {
-          const sisa = kunjungan - elapsedKunjungan;
-          const menit = Math.floor(sisa / 60);
-          const detik = Math.floor(sisa % 60);
-          return { text: `⏱️ ${menit.toString().padStart(2, '0')}:${detik.toString().padStart(2, '0')}`, class: sisa <= 10 ? "merah" : "" };
-        }
-        return { text: "✔️ SELESAI", class: "merah", selesai: true };
-      }
-
-      // ====================== RENDER TABEL + PANGGILAN OTOMATIS SEKALI ======================
-      async function renderTabel() {
-        if (!isOffsetReady) {
-          document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
-          return;
-        }
-        const tbody = document.getElementById("tabelData");
-        tbody.innerHTML = "";
-        const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
-        
-        for (const item of sortedData) {
-          const status = hitungStatus(item);
-          const nomorAntrian = item.nomor || "—";
-          
-          // Panggil otomatis hanya sekali ketika status SELESAI dan belum dipanggil
-          if (status.selesai && !item.sudahDipanggil) {
-            const itemRef = doc(db, "antrian", item.id);
-            try {
-              await runTransaction(db, async (transaction) => {
-                const snap = await transaction.get(itemRef);
-                if (snap.exists() && !snap.data().sudahDipanggil) {
-                  transaction.update(itemRef, { sudahDipanggil: true });
-                  // Simpan panggilan terakhir untuk tombol ulang (lokal)
-                  panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
-                  // Antrekan panggilan suara + notif visual
-                  addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp, true);
-                }
-              });
-              item.sudahDipanggil = true;
-            } catch (err) {
-              console.error("Gagal menandai sudahDipanggil:", err);
-            }
-          }
-          
-          tbody.innerHTML += `
-            <tr>
-              <td>${nomorAntrian}</td>
-              <td>${escapeHtml(item.nama)}</td>
-              <td>${escapeHtml(item.wbp)}</td>
-              <td><span class="${status.class}">${status.text}</span></td>
-              <td><button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button></td>
-            </tr>
-          `;
+      async function loadData() {
+        try {
+          const snapshot = await getDocs(collection(db, "antrian"));
+          document.getElementById("infoAntrian").innerHTML = `📊 Total antrian saat ini: ${snapshot.size} orang`;
+        } catch (error) {
+          console.error(error);
         }
       }
-      
-      function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
 
-      // ====================== HAPUS DATA ======================
-      window.hapusData = async function (id) {
-        if (!confirm("Hapus antrian ini?")) return;
-        await deleteDoc(doc(db, "antrian", id));
-      };
-      
-      window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0")) return;
-        const snapshot = await getDocs(collection(db, "antrian"));
-        const promises = [];
-        snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
-        await Promise.all(promises);
+      function tampilNotif(pesan, isError = false) {
+        let div = document.createElement("div");
+        div.className = "notif-sukses";
+        div.style.background = isError ? "#b91c1c" : "#0e7c32";
+        div.innerText = pesan;
+        let container = document.getElementById("notifTemp");
+        container.innerHTML = "";
+        container.appendChild(div);
+        setTimeout(() => { div.remove(); }, 3000);
+      }
+
+      // ====================== GENERATE NOMOR ANTRIAN (INCREMENTAL) ======================
+      async function getNextNomor() {
         const counterRef = doc(db, "counter", "antrianCounter");
-        await setDoc(counterRef, { value: 0 });
-      };
-
-      // ====================== ULANGI PANGGILAN (SEMUA DEVICE) ======================
-      window.ulangiPanggilanTerakhir = async function () {
-        if (!panggilanTerakhir) {
-          console.warn("Tidak ada panggilan terakhir di sesi ini.");
-          showVisualNotification("?", "Tidak ada data", "Tekan panggilan otomatis dulu");
-          return;
-        }
-        // Kirim perintah ulang ke Firestore (dengan timestamp server)
-        await setDoc(repeatCallDocRef, {
-          nomor: panggilanTerakhir.nomor,
-          nama: panggilanTerakhir.nama,
-          wbp: panggilanTerakhir.wbp,
-          timestamp: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-        console.log("Perintah ulang panggilan dikirim ke Firestore");
-      };
-
-      // Dengarkan perintah ulang dari device mana pun
-      function listenRepeatCall() {
-        onSnapshot(repeatCallDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            const newTimestamp = data.updatedAt?.toDate?.()?.getTime() || 0;
-            if (newTimestamp > lastRepeatTimestamp && newTimestamp !== 0) {
-              lastRepeatTimestamp = newTimestamp;
-              const { nomor, nama, wbp } = data;
-              if (nomor && nama && wbp) {
-                console.log(`📢 Menerima perintah ulang panggilan dari device lain: nomor ${nomor}`);
-                addToQueue(panggilSekali, nomor, nama, wbp, true);
-              }
+        try {
+          const result = await runTransaction(db, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            let current = 1;
+            if (counterDoc.exists()) {
+              current = counterDoc.data().value + 1;
             }
-          }
-        }, (error) => {
-          console.error("Gagal mendengarkan repeatCall:", error);
-        });
+            transaction.set(counterRef, { value: current });
+            return current;
+          });
+          return result;
+        } catch (error) {
+          console.error("Gagal mendapatkan nomor antrian:", error);
+          // Fallback: cari nomor tertinggi dari koleksi antrian
+          const snapshot = await getDocs(collection(db, "antrian"));
+          let max = 0;
+          snapshot.forEach(doc => {
+            const nomor = doc.data().nomor || 0;
+            if (nomor > max) max = nomor;
+          });
+          return max + 1;
+        }
       }
 
-      window.toggleFullscreen = function () {
-        document.getElementById("mainContainer").classList.toggle("fullscreen");
+      window.tambahAntrianBaru = async function () {
+        let nama = document.getElementById("namaPengunjung").value.trim();
+        let wbp = document.getElementById("namaWbp").value.trim();
+
+        if (!nama || !wbp) {
+          tampilNotif("⚠️ Nama Pengunjung dan Nama WBP wajib diisi!", true);
+          return;
+        }
+
+        try {
+          const nomorBaru = await getNextNomor();
+          await addDoc(collection(db, "antrian"), {
+            nomor: nomorBaru,
+            nama: nama,
+            wbp: wbp,
+            status: "persiapan",
+            createdAt: serverTimestamp(),
+            durasiPersiapan: 10,
+            durasiKunjungan: 15,
+          });
+
+          tampilNotif(`✅ Antrian berhasil ditambahkan (Nomor: ${nomorBaru})`);
+          document.getElementById("namaPengunjung").value = "";
+          document.getElementById("namaWbp").value = "";
+          document.getElementById("namaPengunjung").focus();
+          loadData();
+        } catch (error) {
+          console.error(error);
+          tampilNotif("❌ Gagal menyimpan data ke Firebase", true);
+        }
       };
 
-      // ====================== LISTENER DATA ANTRIAN + UPDATE OTOMATIS PER DETIK ======================
-      onSnapshot(collection(db, "antrian"), (snapshot) => {
-        const newData = [];
-        snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
-        daftarData = newData;
-        renderTabel();   // langsung render
-      });
-
-      // Update timer setiap 1 detik agar countdown tetap berjalan tanpa perlu snapshot ulang
-      setInterval(() => {
-        if (isOffsetReady && daftarData.length) renderTabel();
-      }, 1000);
-
-      // ====================== INIT ======================
-      window.onload = async function () {
-        await calibrateServerTime();
-        await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | Panggilan hanya sekali & notifikasi ulang multi-device";
-        listenRepeatCall();
-        renderTabel();
+      window.kembaliKeDashboard = function () {
+        window.location.href = "./Jamkot0.html";
       };
+
+      loadData();
+      setInterval(loadData, 5000);
     </script>
   </body>
 </html>
