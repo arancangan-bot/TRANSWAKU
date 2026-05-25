@@ -116,6 +116,12 @@
         max-width: 400px;
         margin: 0 auto;
       }
+      .catatan-kecil {
+        font-size: 0.75rem;
+        color: #475569;
+        margin-top: 5px;
+        margin-left: 12px;
+      }
     </style>
   </head>
   <body>
@@ -128,6 +134,14 @@
         <h2>📋 TAMBAH ANTRIAN</h2>
         <p>Lapas Kelas IIA Cikarang</p>
       </div>
+      
+      <!-- KOLOM NOMOR ANTRIAN (MANUAL / OPSIONAL) -->
+      <div class="form-group">
+        <label>🔢 Nomor Antrian <span style="font-weight:normal;">(Opsional)</span></label>
+        <input type="number" id="nomorAntrian" placeholder="Kosongkan = otomatis (1,2,3...)" min="1" step="1" />
+        <div class="catatan-kecil">※ Jika diisi, nomor harus unik (belum dipakai). Sistem akan memakainya & menyesuaikan counter otomatis.</div>
+      </div>
+
       <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="contoh: Budi Santoso" /></div>
       <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="contoh: Andi Wijaya" autocomplete="off" /></div>
       <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
@@ -136,7 +150,7 @@
     <div id="notifTemp"></div>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, getDoc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, getDoc, setDoc, runTransaction, query, where } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -150,6 +164,7 @@
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
+      // ====================== LOAD JUMLAH ANTRIAN ======================
       async function loadData() {
         try {
           const snapshot = await getDocs(collection(db, "antrian"));
@@ -167,10 +182,10 @@
         let container = document.getElementById("notifTemp");
         container.innerHTML = "";
         container.appendChild(div);
-        setTimeout(() => { div.remove(); }, 3000);
+        setTimeout(() => { div.remove(); }, 3500);
       }
 
-      // ====================== GENERATE NOMOR ANTRIAN (INCREMENTAL) ======================
+      // ====================== GENERATE NOMOR OTOMATIS (INCREMENT) ======================
       async function getNextNomor() {
         const counterRef = doc(db, "counter", "antrianCounter");
         try {
@@ -185,47 +200,110 @@
           });
           return result;
         } catch (error) {
-          console.error("Gagal mendapatkan nomor antrian:", error);
+          console.error("Gagal mendapatkan nomor antrian (transaksi):", error);
           // Fallback: cari nomor tertinggi dari koleksi antrian
           const snapshot = await getDocs(collection(db, "antrian"));
           let max = 0;
-          snapshot.forEach(doc => {
-            const nomor = doc.data().nomor || 0;
+          snapshot.forEach(docSnap => {
+            const nomor = docSnap.data().nomor || 0;
             if (nomor > max) max = nomor;
           });
           return max + 1;
         }
       }
 
+      // ====================== CEK APAKAH NOMOR SUDAH TERPAKAI ======================
+      async function isNomorTerpakai(nomor) {
+        const q = query(collection(db, "antrian"), where("nomor", "==", nomor));
+        const snapshot = await getDocs(q);
+        return !snapshot.empty;
+      }
+
+      // ====================== UPDATE COUNTER JIKA NOMOR MANUAL LEBIH BESAR ======================
+      async function updateCounterJikaPerlu(nomorManual) {
+        const counterRef = doc(db, "counter", "antrianCounter");
+        await runTransaction(db, async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          let currentVal = 0;
+          if (counterDoc.exists()) currentVal = counterDoc.data().value;
+          if (nomorManual > currentVal) {
+            transaction.set(counterRef, { value: nomorManual });
+          }
+        });
+      }
+
+      // ====================== TAMBAH ANTRIAN (DENGAN DUKUNGAN MANUAL ATAU OTOMATIS) ======================
       window.tambahAntrianBaru = async function () {
         let nama = document.getElementById("namaPengunjung").value.trim();
         let wbp = document.getElementById("namaWbp").value.trim();
+        let inputNomor = document.getElementById("nomorAntrian").value.trim();
 
         if (!nama || !wbp) {
           tampilNotif("⚠️ Nama Pengunjung dan Nama WBP wajib diisi!", true);
           return;
         }
 
+        let nomorFinal = null;
+        let isManual = false;
+
+        // KASUS 1: input nomor diisi (manual)
+        if (inputNomor !== "") {
+          const nomorParsed = parseInt(inputNomor, 10);
+          if (isNaN(nomorParsed) || nomorParsed < 1) {
+            tampilNotif("❌ Nomor antrian harus angka positif (minimal 1)", true);
+            return;
+          }
+
+          // Cek apakah nomor sudah terpakai
+          const sudahTerpakai = await isNomorTerpakai(nomorParsed);
+          if (sudahTerpakai) {
+            tampilNotif(`❌ Nomor ${nomorParsed} sudah digunakan. Gunakan nomor lain atau kosongkan untuk otomatis.`, true);
+            return;
+          }
+
+          nomorFinal = nomorParsed;
+          isManual = true;
+        } 
+        // KASUS 2: kosongkan -> generate otomatis
+        else {
+          nomorFinal = await getNextNomor();
+          isManual = false;
+        }
+
+        // Pastikan nomorFinal tidak null
+        if (!nomorFinal) {
+          tampilNotif("❌ Gagal menentukan nomor antrian", true);
+          return;
+        }
+
         try {
-          const nomorBaru = await getNextNomor();
+          // Untuk manual: update counter jika nomor manual > counter saat ini (agar urutan otomatis selanjutnya lebih besar)
+          if (isManual) {
+            await updateCounterJikaPerlu(nomorFinal);
+          }
+
+          // Simpan ke Firestore (gunakan addDoc agar ID tetap unik, tapi field nomor kita set manual)
           await addDoc(collection(db, "antrian"), {
-            nomor: nomorBaru,
+            nomor: nomorFinal,
             nama: nama,
             wbp: wbp,
             status: "persiapan",
             createdAt: serverTimestamp(),
             durasiPersiapan: 10,
             durasiKunjungan: 15,
+            sudahDipanggil: false   // biar sinkron dengan dashboard
           });
 
-          tampilNotif(`✅ Antrian berhasil ditambahkan (Nomor: ${nomorBaru})`);
+          tampilNotif(`✅ Antrian berhasil ditambahkan (Nomor: ${nomorFinal})`);
+          // Reset form
           document.getElementById("namaPengunjung").value = "";
           document.getElementById("namaWbp").value = "";
+          document.getElementById("nomorAntrian").value = "";   // kosongkan input manual
           document.getElementById("namaPengunjung").focus();
           loadData();
         } catch (error) {
-          console.error(error);
-          tampilNotif("❌ Gagal menyimpan data ke Firebase", true);
+          console.error("Gagal simpan antrian:", error);
+          tampilNotif("❌ Gagal menyimpan data ke Firebase. Cek koneksi atau coba lagi.", true);
         }
       };
 
@@ -233,6 +311,7 @@
         window.location.href = "./Jamkot0.html";
       };
 
+      // ====================== INIT ======================
       loadData();
       setInterval(loadData, 5000);
     </script>
