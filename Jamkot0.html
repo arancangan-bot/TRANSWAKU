@@ -151,7 +151,7 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, runTransaction, Timestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -173,6 +173,10 @@
       let isProcessingQueue = false;
       let serverTimeOffset = 0;
       let isOffsetReady = false;
+
+      // Untuk sinkronisasi "Ulangi Panggilan" antar device
+      let lastRepeatTimestamp = 0;   // menyimpan timestamp (dalam ms) terakhir yang sudah diproses oleh device ini
+      const repeatCallDocRef = doc(db, "global", "repeatCall");
 
       // ====================== KALIBRASI SERVER TIME ======================
       async function calibrateServerTime() {
@@ -246,7 +250,6 @@
         console.log("🔊 Backsound diputar (sekali)");
       }
 
-      // Satu kali panggilan: backsound -> jeda 3 detik -> suara
       async function panggilSekali(nomor, nama, wbp) {
         putarBacksound();
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -260,7 +263,7 @@
         while (callQueue.length > 0) {
           const task = callQueue.shift();
           try { await task(); } catch (err) { console.error(err); }
-          await new Promise(resolve => setTimeout(resolve, 500)); // jeda antar antrian berbeda
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
         isProcessingQueue = false;
       }
@@ -292,7 +295,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER ======================
+      // ====================== RENDER TABEL ======================
       let renderRequestId = null;
       async function renderTabel() {
         if (!isOffsetReady) {
@@ -307,20 +310,15 @@
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
-          // Hanya panggil sekali jika sudah selesai dan belum dipanggil
           if (status.selesai && !item.sudahDipanggil) {
-            // Tandai sudah dipanggil di Firestore (atomic)
             try {
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
             } catch (err) { 
               console.error("Gagal update sudahDipanggil:", err);
-              // Jika gagal update karena conflict, jangan lanjutkan panggilan
-              if (err.code === 'already-exists') continue;
             }
             panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
             addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-            tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
           }
           tbody.innerHTML += `
             <tr>
@@ -337,36 +335,78 @@
       }
       function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
       function tampilNotif(judul, pesan, warna) {
+        // Notifikasi internal (bisa digunakan untuk keperluan lain tapi tidak untuk hapus semua)
         const box = document.getElementById("notifikasi");
         box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
         box.style.display = "block";
         setTimeout(() => { box.style.display = "none"; }, 4000);
       }
 
-      // ====================== HAPUS ======================
+      // ====================== HAPUS DATA ======================
       window.hapusData = async function (id) {
         if (!confirm("Hapus antrian ini?")) return;
         await deleteDoc(doc(db, "antrian", id));
       };
+      
       window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian?")) return;
+        if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0, antrian berikutnya mulai dari nomor 1")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        tampilNotif("🗑️ SEMUA DATA TERHAPUS", "", "#1e466e");
+        // NOTIFIKASI DIHAPUS - tidak menampilkan apapun
+        // Hanya kosongkan agar tidak muncul popup
       };
+
+      // ====================== ULANGI PANGGILAN (SINKRON SEMUA DEVICE) ======================
+      // Fungsi untuk mengirim perintah ulang panggilan ke Firestore
       window.ulangiPanggilanTerakhir = async function () {
-        if (!panggilanTerakhir) { alert("Belum ada panggilan selesai."); return; }
-        addToQueue(panggilSekali, panggilanTerakhir.nomor, panggilanTerakhir.nama, panggilanTerakhir.wbp);
+        if (!panggilanTerakhir) {
+          // Tidak ada panggilan terakhir, beri tahu user lewat console atau tidak usah notif
+          console.warn("Tidak ada panggilan terakhir untuk diulang.");
+          return;
+        }
+        // Simpan data ke Firestore dengan timestamp server
+        const nowServer = Timestamp.now();
+        await setDoc(repeatCallDocRef, {
+          nomor: panggilanTerakhir.nomor,
+          nama: panggilanTerakhir.nama,
+          wbp: panggilanTerakhir.wbp,
+          timestamp: nowServer,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Perintah ulang panggilan dikirim ke Firestore");
       };
+
+      // Mendengarkan perubahan pada dokumen repeatCall (sinkronisasi antar device)
+      function listenRepeatCall() {
+        onSnapshot(repeatCallDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const newTimestamp = data.timestamp?.toDate?.()?.getTime() || 0;
+            // Jika timestamp lebih baru dari yang terakhir diproses oleh device ini
+            if (newTimestamp > lastRepeatTimestamp && newTimestamp !== 0) {
+              lastRepeatTimestamp = newTimestamp;
+              const { nomor, nama, wbp } = data;
+              if (nomor && nama && wbp) {
+                console.log(`📢 Menerima perintah ulang panggilan dari device lain: nomor ${nomor}`);
+                addToQueue(panggilSekali, nomor, nama, wbp);
+              }
+            }
+          }
+        }, (error) => {
+          console.error("Gagal mendengarkan repeatCall:", error);
+        });
+      }
+
+      // ====================== FULLSCREEN ======================
       window.toggleFullscreen = function () {
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== FIRESTORE LISTENER ======================
+      // ====================== FIRESTORE LISTENER (ANTRIAN) ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
@@ -378,7 +418,11 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "";
+        // Ubah teks indicator refresh (hilangkan teks backsound)
+        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | Semua device terhubung";
+        // Mulai mendengarkan perintah ulang panggilan
+        listenRepeatCall();
+        renderTabel();
       };
     </script>
   </body>
