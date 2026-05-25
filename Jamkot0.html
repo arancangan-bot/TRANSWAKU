@@ -175,7 +175,7 @@
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc, query, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -197,21 +197,8 @@
       let serverTimeOffset = 0;
       let isOffsetReady = false;
       
-      // Untuk mencegah eksekusi ganda perintah pada device yang sama
-      const executedCommandsKey = "executed_commands";
-      let executedCommands = new Set(JSON.parse(localStorage.getItem(executedCommandsKey) || "[]"));
-      
-      // Simpan ID perintah yang sudah dieksekusi ke localStorage
-      function markCommandExecuted(commandId) {
-        executedCommands.add(commandId);
-        // Simpan maksimal 100 ID terakhir agar tidak membesar
-        const arr = Array.from(executedCommands).slice(-100);
-        localStorage.setItem(executedCommandsKey, JSON.stringify(arr));
-      }
-      
-      function isCommandExecuted(commandId) {
-        return executedCommands.has(commandId);
-      }
+      // Referensi untuk perintah panggilan ulang (sinkronisasi antar device)
+      const perintahPanggilanRef = collection(db, "perintah_panggilan");
 
       // ====================== KALIBRASI SERVER TIME ======================
       async function calibrateServerTime() {
@@ -307,10 +294,10 @@
         processQueue();
       }
 
-      // ====================== BROADCAST PANGGILAN ULANG (SEMUA DEVICE) ======================
+      // ====================== SINKRONISASI PERINTAH PANGGILAN ULANG (SEMUA DEVICE) ======================
       async function kirimPerintahPanggilan(nomor, nama, wbp) {
         try {
-          await addDoc(collection(db, "perintah_panggilan"), {
+          await addDoc(perintahPanggilanRef, {
             nomor: nomor,
             nama: nama,
             wbp: wbp,
@@ -322,62 +309,35 @@
         }
       }
 
-      // Eksekusi perintah (hanya jika belum pernah dieksekusi oleh device ini)
-      async function eksekusiPerintah(commandDoc) {
-        const data = commandDoc.data();
-        const commandId = commandDoc.id;
-        if (isCommandExecuted(commandId)) {
-          console.log(`⏭️ Perintah ${commandId} sudah dieksekusi device ini, lewati.`);
-          return;
-        }
+      // Fungsi untuk mengeksekusi perintah dari Firestore
+      async function eksekusiPerintahPanggilan(docSnap) {
+        const data = docSnap.data();
         const { nomor, nama, wbp } = data;
         if (nomor && nama && wbp) {
           addToQueue(panggilSekali, nomor, nama, wbp);
-          console.log(`📢 Eksekusi panggilan ulang di device ini: ${nomor} - ${nama} -> ${wbp}`);
-          markCommandExecuted(commandId);
+          console.log(`📢 Eksekusi panggilan ulang: ${nomor} - ${nama} -> ${wbp}`);
         }
+        // Hapus perintah setelah diproses agar tidak menumpuk
+        await deleteDoc(doc(db, "perintah_panggilan", docSnap.id));
       }
 
-      // Membersihkan perintah yang sudah lebih dari 30 detik (agar database tidak penuh)
-      async function bersihkanPerintahLama() {
-        const batasWaktu = new Date(Date.now() - 30000); // 30 detik yang lalu
+      // Listener realtime untuk perintah panggilan (semua device akan mendengar)
+      let isProcessingCommand = false;
+      onSnapshot(perintahPanggilanRef, async (snapshot) => {
+        if (isProcessingCommand) return;
+        isProcessingCommand = true;
         try {
-          const q = query(collection(db, "perintah_panggilan"), where("createdAt", "<=", batasWaktu));
-          const snapshot = await getDocs(q);
-          const batch = [];
-          snapshot.forEach(doc => batch.push(deleteDoc(doc.ref)));
-          await Promise.all(batch);
-          if (batch.length > 0) console.log(`🧹 Dihapus ${batch.length} perintah lama`);
-        } catch (err) {
-          console.error("Gagal membersihkan perintah lama:", err);
-        }
-      }
-
-      // Listener perintah baru (hanya untuk perintah yang umurnya kurang dari 30 detik)
-      // Kita gunakan query dengan orderBy createdAt descending, dan batasi 50 terbaru
-      const perintahQuery = query(collection(db, "perintah_panggilan"), orderBy("createdAt", "desc"), limit(50));
-      onSnapshot(perintahQuery, (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === "added") {
-            const docData = change.doc.data();
-            // Jangan eksekusi perintah yang sudah terlalu tua (lebih dari 30 detik)
-            if (docData.createdAt) {
-              const docTime = docData.createdAt.toDate().getTime();
-              const now = Date.now();
-              if (now - docTime > 30000) {
-                console.log("⏳ Perintah terlalu tua, lewati.");
-                return;
-              }
+          for (const change of snapshot.docChanges()) {
+            if (change.type === "added") {
+              await eksekusiPerintahPanggilan(change.doc);
             }
-            await eksekusiPerintah(change.doc);
           }
-        });
+        } catch (err) {
+          console.error("Error memproses perintah panggilan:", err);
+        } finally {
+          isProcessingCommand = false;
+        }
       });
-
-      // Pembersihan periodik setiap 60 detik
-      setInterval(() => {
-        bersihkanPerintahLama();
-      }, 60000);
 
       // ====================== STATUS TIMER ======================
       function hitungStatus(item) {
@@ -475,7 +435,7 @@
           console.warn("Data tidak lengkap untuk mengulang panggilan");
           return;
         }
-        // Kirim perintah ke Firestore, semua device akan mendengar dan mengeksekusi (termasuk pengirim)
+        // Kirim perintah ke Firestore, semua device (termasuk pengirim) akan mendengar dan mengeksekusi
         kirimPerintahPanggilan(nomor, nama, wbp);
         tampilNotif("📡 Perintah dikirim", `Panggilan ulang untuk antrian ${nomor} akan diputar di semua layar`, "#0f5c6e");
       };
@@ -494,7 +454,7 @@
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // Tidak ada notifikasi popup sesuai permintaan
+        // Tidak menampilkan notifikasi popup sesuai permintaan
         console.log("Semua data dihapus, counter reset ke 0");
       };
       
@@ -502,7 +462,7 @@
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== FIRESTORE LISTENER UNTUK DATA ANTRIAN ======================
+      // ====================== FIRESTORE LISTENER ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
@@ -514,9 +474,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        document.getElementById("refreshIndicator").innerHTML = "✅ Sinkron panggilan antar device | Klik 'Ulang Panggilan' akan diputar di semua layar (backsound + suara)";
-        // Bersihkan perintah lama saat startup
-        bersihkanPerintahLama();
+        document.getElementById("refreshIndicator").innerHTML = "✅ Sinkron panggilan antar device | Klik Ulang Panggilan akan diputar di semua layar";
         renderTabel();
       };
     </script>
