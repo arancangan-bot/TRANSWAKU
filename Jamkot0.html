@@ -167,15 +167,15 @@
 
       // ====================== GLOBAL ======================
       let daftarData = [];
-      let panggilanTerakhir = null;
+      let panggilanTerakhir = null;       // Hanya disimpan di memori, akan hilang jika refresh/device mati
       let suaraPerempuan = null;
       let callQueue = [];
       let isProcessingQueue = false;
       let serverTimeOffset = 0;
       let isOffsetReady = false;
 
-      // Untuk sinkronisasi "Ulangi Panggilan" antar device
-      let lastRepeatTimestamp = 0;   // menyimpan timestamp (dalam ms) terakhir yang sudah diproses oleh device ini
+      // Sinkronisasi ulang panggilan antar device
+      let lastRepeatTimestamp = 0;
       const repeatCallDocRef = doc(db, "global", "repeatCall");
 
       // ====================== KALIBRASI SERVER TIME ======================
@@ -256,7 +256,7 @@
         await playSuara(nomor, nama, wbp);
       }
 
-      // ====================== QUEUE (ANTRIAN PANGGILAN) ======================
+      // ====================== QUEUE PANGGILAN ======================
       async function processQueue() {
         if (isProcessingQueue) return;
         isProcessingQueue = true;
@@ -280,7 +280,7 @@
         let elapsed = (serverNow - serverCreated) / 1000;
         if (elapsed < 0) elapsed = 0;
         const persiapan = item.durasiPersiapan || 10;
-        const kunjungan = item.durasiKunjungan || 300;
+        const kunjungan = item.durasiKunjungan || 15; // 15 detik untuk demo
         if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
@@ -295,7 +295,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL ======================
+      // ====================== RENDER TABEL & PANGGILAN OTOMATIS (HANYA SEKALI) ======================
       let renderRequestId = null;
       async function renderTabel() {
         if (!isOffsetReady) {
@@ -305,21 +305,28 @@
         const tbody = document.getElementById("tabelData");
         tbody.innerHTML = "";
         const sortedData = [...daftarData].sort((a, b) => (b.nomor || 0) - (a.nomor || 0));
+        
         for (const item of sortedData) {
           const status = hitungStatus(item);
-          let nomorAntrian = item.nomor;
-          if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
+          let nomorAntrian = item.nomor || "—";
           
+          // HANYA panggil jika status SELESAI dan BELUM PERNAH dipanggil
+          // Field "sudahDipanggil" menjamin bahwa satu antrian hanya dipanggil sekali seumur hidup
           if (status.selesai && !item.sudahDipanggil) {
             try {
+              // Tandai sudah dipanggil di Firestore
               await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
-            } catch (err) { 
+              // Simpan data panggilan terakhir di memori (hanya untuk sesi ini)
+              panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
+              // Antrekan panggilan suara
+              addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+            } catch (err) {
               console.error("Gagal update sudahDipanggil:", err);
+              // Jika gagal, jangan lanjutkan agar tidak double call
             }
-            panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
-            addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
           }
+          
           tbody.innerHTML += `
             <tr>
               <td>${nomorAntrian}</td>
@@ -330,17 +337,12 @@
             </tr>
           `;
         }
+        
         if (renderRequestId) cancelAnimationFrame(renderRequestId);
         renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 100); });
       }
+      
       function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
-      function tampilNotif(judul, pesan, warna) {
-        // Notifikasi internal (bisa digunakan untuk keperluan lain tapi tidak untuk hapus semua)
-        const box = document.getElementById("notifikasi");
-        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
-        box.style.display = "block";
-        setTimeout(() => { box.style.display = "none"; }, 4000);
-      }
 
       // ====================== HAPUS DATA ======================
       window.hapusData = async function (id) {
@@ -349,26 +351,23 @@
       };
       
       window.hapusSemuaData = async function () {
-        if (!confirm("⚠️ Hapus SEMUA antrian? Counter akan direset ke 0, antrian berikutnya mulai dari nomor 1")) return;
+        if (!confirm("⚠️ Hapus SEMUA antrian?")) return;
         const snapshot = await getDocs(collection(db, "antrian"));
         const promises = [];
         snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // NOTIFIKASI DIHAPUS - tidak menampilkan apapun
-        // Hanya kosongkan agar tidak muncul popup
+        // Tidak menampilkan notifikasi apapun (sesuai permintaan)
       };
 
       // ====================== ULANGI PANGGILAN (SINKRON SEMUA DEVICE) ======================
-      // Fungsi untuk mengirim perintah ulang panggilan ke Firestore
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
-          // Tidak ada panggilan terakhir, beri tahu user lewat console atau tidak usah notif
-          console.warn("Tidak ada panggilan terakhir untuk diulang.");
+          console.warn("Tidak ada panggilan terakhir di sesi ini.");
           return;
         }
-        // Simpan data ke Firestore dengan timestamp server
+        // Kirim perintah ke Firestore agar semua device yang terhubung ikut memanggil ulang
         const nowServer = Timestamp.now();
         await setDoc(repeatCallDocRef, {
           nomor: panggilanTerakhir.nomor,
@@ -380,13 +379,12 @@
         console.log("Perintah ulang panggilan dikirim ke Firestore");
       };
 
-      // Mendengarkan perubahan pada dokumen repeatCall (sinkronisasi antar device)
+      // Mendengarkan perintah ulang panggilan dari device manapun
       function listenRepeatCall() {
         onSnapshot(repeatCallDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             const newTimestamp = data.timestamp?.toDate?.()?.getTime() || 0;
-            // Jika timestamp lebih baru dari yang terakhir diproses oleh device ini
             if (newTimestamp > lastRepeatTimestamp && newTimestamp !== 0) {
               lastRepeatTimestamp = newTimestamp;
               const { nomor, nama, wbp } = data;
@@ -406,7 +404,7 @@
         document.getElementById("mainContainer").classList.toggle("fullscreen");
       };
 
-      // ====================== FIRESTORE LISTENER (ANTRIAN) ======================
+      // ====================== LISTENER DATA ANTRIAN ======================
       onSnapshot(collection(db, "antrian"), (snapshot) => {
         const newData = [];
         snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
@@ -418,9 +416,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        // Ubah teks indicator refresh (hilangkan teks backsound)
-        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | Semua device terhubung";
-        // Mulai mendengarkan perintah ulang panggilan
+        document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime";
         listenRepeatCall();
         renderTabel();
       };
