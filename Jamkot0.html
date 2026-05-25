@@ -649,7 +649,7 @@
     };
 
     window.hapusSemuaData = async function () {
-      if (!confirm("⚠️ PERINGATAN! Hapus SEMUA antrian? Counter nomor antrian akan direset ke 0. Antrian baru akan dimulai dari nomor 1.")) return;
+      if (!confirm("⚠️ PERINGATAN! Hapus SEMUA antrian?")) return;
       const snapshot = await getDocs(collection(db, "antrian"));
       const promises = [];
       snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
@@ -693,11 +693,10 @@
       await calibrateServerTime();
       await getSuaraPerempuan();
       const badge = document.getElementById("refreshIndicator");
-      if (badge) badge.innerHTML = "✅ Urutan: TERBARU DI ATAS | Sinkron panggilan antar device | Real-time";
+      if (badge) badge.innerHTML = "✅  Sinkron | Real-time";
       renderTabel();
     };
   </script>
 </body>
 
 </html>
-```
