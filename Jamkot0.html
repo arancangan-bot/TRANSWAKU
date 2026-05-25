@@ -175,7 +175,7 @@
       let isOffsetReady = false;
 
       // Untuk sinkronisasi "Ulangi Panggilan" antar device
-      let lastRepeatTimestamp = 0;   // menyimpan timestamp (dalam ms) terakhir yang sudah diproses oleh device ini
+      let lastRepeatTimestamp = 0;
       const repeatCallDocRef = doc(db, "global", "repeatCall");
 
       // ====================== KALIBRASI SERVER TIME ======================
@@ -216,7 +216,7 @@
       function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
       setInterval(async () => { if (isOffsetReady) { await calibrateServerTime(); renderTabel(); } }, 30000);
 
-      // ====================== SUARA & BACKSOUND ======================
+      // ====================== SUARA (Hanya untuk "Ulangi Panggilan") ======================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if (suaraPerempuan) { resolve(suaraPerempuan); return; }
@@ -295,7 +295,7 @@
         return { text: "✔️ SELESAI", class: "merah", selesai: true };
       }
 
-      // ====================== RENDER TABEL ======================
+      // ====================== RENDER TABEL (TANPA PANGGILAN OTOMATIS SAAT SELESAI) ======================
       let renderRequestId = null;
       async function renderTabel() {
         if (!isOffsetReady) {
@@ -310,16 +310,10 @@
           let nomorAntrian = item.nomor;
           if (!nomorAntrian || nomorAntrian === 0) nomorAntrian = "—";
           
-          if (status.selesai && !item.sudahDipanggil) {
-            try {
-              await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
-              item.sudahDipanggil = true;
-            } catch (err) { 
-              console.error("Gagal update sudahDipanggil:", err);
-            }
-            panggilanTerakhir = { nomor: nomorAntrian, nama: item.nama, wbp: item.wbp };
-            addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-          }
+          // ========== PERUBAHAN UTAMA: Tidak ada panggilan suara/backsound/notifikasi otomatis saat status SELESAI ==========
+          // Blok kode sebelumnya yang memanggil panggilSekali() dan update sudah dihapus.
+          // Sekarang antrian yang selesai hanya ditampilkan teks "✔️ SELESAI" tanpa efek suara/visual apapun.
+
           tbody.innerHTML += `
             <tr>
               <td>${nomorAntrian}</td>
@@ -334,13 +328,6 @@
         renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 100); });
       }
       function escapeHtml(str) { if (!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[m]); }
-      function tampilNotif(judul, pesan, warna) {
-        // Notifikasi internal (bisa digunakan untuk keperluan lain tapi tidak untuk hapus semua)
-        const box = document.getElementById("notifikasi");
-        box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px; border-radius:24px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3);"><strong>${judul}</strong><br>${pesan}</div>`;
-        box.style.display = "block";
-        setTimeout(() => { box.style.display = "none"; }, 4000);
-      }
 
       // ====================== HAPUS DATA ======================
       window.hapusData = async function (id) {
@@ -356,19 +343,15 @@
         await Promise.all(promises);
         const counterRef = doc(db, "counter", "antrianCounter");
         await setDoc(counterRef, { value: 0 });
-        // NOTIFIKASI DIHAPUS - tidak menampilkan apapun
-        // Hanya kosongkan agar tidak muncul popup
+        // Tidak ada notifikasi visual apapun
       };
 
-      // ====================== ULANGI PANGGILAN (SINKRON SEMUA DEVICE) ======================
-      // Fungsi untuk mengirim perintah ulang panggilan ke Firestore
+      // ====================== ULANGI PANGGILAN (MANUAL) ======================
       window.ulangiPanggilanTerakhir = async function () {
         if (!panggilanTerakhir) {
-          // Tidak ada panggilan terakhir, beri tahu user lewat console atau tidak usah notif
           console.warn("Tidak ada panggilan terakhir untuk diulang.");
           return;
         }
-        // Simpan data ke Firestore dengan timestamp server
         const nowServer = Timestamp.now();
         await setDoc(repeatCallDocRef, {
           nomor: panggilanTerakhir.nomor,
@@ -380,13 +363,12 @@
         console.log("Perintah ulang panggilan dikirim ke Firestore");
       };
 
-      // Mendengarkan perubahan pada dokumen repeatCall (sinkronisasi antar device)
+      // Mendengarkan perintah ulang panggilan dari device lain (tetap aktif)
       function listenRepeatCall() {
         onSnapshot(repeatCallDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             const newTimestamp = data.timestamp?.toDate?.()?.getTime() || 0;
-            // Jika timestamp lebih baru dari yang terakhir diproses oleh device ini
             if (newTimestamp > lastRepeatTimestamp && newTimestamp !== 0) {
               lastRepeatTimestamp = newTimestamp;
               const { nomor, nama, wbp } = data;
@@ -418,9 +400,7 @@
       window.onload = async function () {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        // Ubah teks indicator refresh (hilangkan teks backsound)
         document.getElementById("refreshIndicator").innerHTML = "🔄 Sinkronisasi realtime | Semua device terhubung";
-        // Mulai mendengarkan perintah ulang panggilan
         listenRepeatCall();
         renderTabel();
       };
