@@ -127,7 +127,6 @@
       font-weight: 600;
       z-index: 10;
     }
-    /* PERBAIKAN: nomor antrian di tengah */
     td:first-child, th:first-child {
       text-align: center;
     }
@@ -530,9 +529,9 @@
     let elapsed = (serverNow - serverCreated) / 1000;
     if (elapsed < 0) elapsed = 0;
     const persiapan = item.durasiPersiapan || 10;
-    // Gunakan durasiKunjungan dari item, jika tidak ada atau 0, pakai 300 (5 menit)
+    // Pastikan durasi kunjungan minimal 60 detik (kompatibilitas data lama yang bernilai kecil)
     let kunjungan = item.durasiKunjungan;
-    if (!kunjungan || kunjungan < 60) kunjungan = 300; // perbaikan untuk data lama yang bernilai 15
+    if (!kunjungan || kunjungan < 60) kunjungan = 300; // 5 menit
     const totalDurasi = persiapan + kunjungan;
     if (elapsed >= totalDurasi && !item.sudahDipanggil) {
       const antrianRef = doc(db, "antrian", item.id);
