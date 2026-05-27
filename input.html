@@ -265,7 +265,7 @@
             await updateCounterJikaPerlu(nomorFinal);
           }
 
-          // PERBAIKAN: Durasi kunjungan diatur 300 detik (5 menit) agar sinkron dengan dashboard
+          // DURASI KUNJUNGAN 300 DETIK (5 MENIT)
           await addDoc(collection(db, "antrian"), {
             nomor: nomorFinal,
             nama: nama,
@@ -273,7 +273,7 @@
             status: "persiapan",
             createdAt: serverTimestamp(),
             durasiPersiapan: 10,
-            durasiKunjungan: 300,   // ← diubah dari 15 menjadi 300 detik
+            durasiKunjungan: 300,
             sudahDipanggil: false
           });
 
