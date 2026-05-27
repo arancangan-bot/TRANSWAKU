@@ -131,20 +131,19 @@
         <img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display = 'none'" />
       </div>
       <div class="judul">
-        <h2>📋 TAMBAH ANTRIAN</h2>
-        <p>Lapas Kelas IIA Cikarang</p>
+        <h2>TAMBAH ANTRIAN</h2>
+        <p>LAPAS KELAS IIA CIKARANG</p>
       </div>
       
       <!-- KOLOM NOMOR ANTRIAN (MANUAL / OPSIONAL) -->
       <div class="form-group">
         <label>🔢 Nomor Antrian <span style="font-weight:normal;">(Opsional)</span></label>
         <input type="number" id="nomorAntrian" placeholder="Kosongkan = otomatis (1,2,3...)" min="1" step="1" />
-        <div class="catatan-kecil">※ Jika diisi, nomor harus unik (belum dipakai). Sistem akan memakainya & menyesuaikan counter otomatis.</div>
       </div>
 
       <div class="form-group"><label>👤 Nama Pengunjung</label><input type="text" id="namaPengunjung" placeholder="contoh: Budi Santoso" /></div>
-      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="contoh: Andi Wijaya" autocomplete="off" /></div>
-      <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← Kembali ke Dashboard</button></div>
+      <div class="form-group"><label>🔒 Nama WBP / Tahanan</label><input type="text" id="namaWbp" placeholder="contoh: Andi Wijaya bin Budi Santoso (A1.1)" autocomplete="off" /></div>
+      <div class="btn-group"><button class="btn-simpan" onclick="tambahAntrianBaru()">✅ Simpan Antrian</button><button class="btn-back" onclick="kembaliKeDashboard()">← List Pengunjung</button></div>
       <div class="info-antrian" id="infoAntrian">Memuat jumlah antrian...</div>
     </div>
     <div id="notifTemp"></div>
