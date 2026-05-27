@@ -36,12 +36,22 @@
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
+      margin-bottom: 0;
+      padding-bottom: 15px;
       border-bottom: 4px solid #facc15;
-      padding-bottom: 8px;
-      margin-bottom: 8px;
-      gap: 15px;
+      background-image: url('background.png');
+      background-size: cover;
+      background-position: center 30%;
+      background-repeat: no-repeat;
+      border-radius: 24px 24px 0 0;
     }
 
+    .logo-left {
+      margin-left: 0.5cm;
+    }
+    .logo-right {
+      margin-right: 0.5cm;
+    }
     .logo-left,
     .logo-right {
       padding: 8px 0;
@@ -65,7 +75,7 @@
       object-fit: contain;
     }
 
-    /* Tombol input di luar kotak putih, ukuran kecil, tidak terlalu pojok */
+    /* Tombol input di luar kotak putih */
     .floating-input-btn {
       position: fixed;
       bottom: 35px;
@@ -194,7 +204,73 @@
       background: #c53a3a;
     }
 
+    /* FULLSCREEN OVERLAY untuk pemberitahuan waktu habis */
+    .fullscreen-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.96);
+      backdrop-filter: blur(4px);
+      z-index: 30000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      color: white;
+      font-family: 'Segoe UI', 'Roboto', monospace;
+      transition: all 0.2s ease;
+    }
+    .overlay-content {
+      background: rgba(0,0,0,0.85);
+      padding: 2rem 3rem;
+      border-radius: 60px;
+      border-left: 8px solid #facc15;
+      border-right: 8px solid #facc15;
+      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+      max-width: 90vw;
+    }
+    .overlay-nomor {
+      font-size: 7rem;
+      font-weight: 800;
+      letter-spacing: 4px;
+      margin: 0.2em 0;
+      color: #facc15;
+      text-shadow: 4px 4px 0px #b45309;
+    }
+    .overlay-nama {
+      font-size: 2rem;
+      margin: 0.4rem 0;
+      font-weight: 500;
+    }
+    .overlay-wbp {
+      font-size: 2rem;
+      margin: 0.4rem 0;
+      font-weight: 600;
+      color: #ffb347;
+    }
+    .overlay-tutup {
+      margin-top: 2rem;
+      background: #facc15;
+      color: #1e3c4a;
+      border: none;
+      padding: 12px 32px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .overlay-tutup:hover {
+      background: #ffdd44;
+      transform: scale(1.02);
+    }
     @media (max-width: 700px) {
+      .overlay-nomor { font-size: 3.5rem; }
+      .overlay-nama, .overlay-wbp { font-size: 1.2rem; }
+      .overlay-content { padding: 1rem 1.5rem; }
       body { padding: 15px 12px; }
       .logo-left img, .logo-right img { height: 50px; }
       .floating-input-btn { padding: 5px 12px; font-size: 0.7rem; bottom: 20px; right: 20px; }
@@ -230,16 +306,28 @@
   </div>
 
   <div class="hapus-semua-wrapper">
-    <button onclick="hapusSemuaData()">🗑️ Hapus Semua Data & Reset Counter</button>
+    <button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button>
   </div>
 </div>
 
-<!-- Tombol Input di luar kotak putih, ukuran kecil, tidak terlalu pojok -->
+<!-- Tombol Input -->
 <a href="input.html" class="floating-input-btn">
   <span>📝</span> Input
 </a>
 
+<!-- Notifikasi kecil (opsional, tetap dipertahankan) -->
 <div id="notifikasi" style="display: none"></div>
+
+<!-- FULLSCREEN OVERLAY untuk waktu habis -->
+<div id="fullscreenOverlay" class="fullscreen-overlay" style="display: none;">
+  <div class="overlay-content">
+    <div style="font-size:1.5rem; font-weight:300;">⏰ WAKTU KUNJUNGAN HABIS ⏰</div>
+    <div class="overlay-nomor" id="overlayNomor">-</div>
+    <div class="overlay-nama" id="overlayNamaPengunjung">Pengunjung: -</div>
+    <div class="overlay-wbp" id="overlayNamaWBP">WBP: -</div>
+    <button class="overlay-tutup" id="tutupOverlayBtn">TUTUP</button>
+  </div>
+</div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -266,9 +354,48 @@
   let isProcessingQueue = false;
   let serverTimeOffset = 0;
   let isOffsetReady = false;
+  let overlayTimeout = null; // untuk auto hide overlay
 
   // Perintah panggilan ulang antar device
   const perintahPanggilanRef = collection(db, "perintah_panggilan");
+
+  // Fungsi untuk menampilkan overlay fullscreen (menutupi seluruh layar)
+  function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP) {
+    const overlay = document.getElementById("fullscreenOverlay");
+    if (!overlay) return;
+    
+    // Isi data
+    document.getElementById("overlayNomor").innerText = nomor;
+    document.getElementById("overlayNamaPengunjung").innerHTML = `👤 Pengunjung: ${escapeHtml(namaPengunjung)}`;
+    document.getElementById("overlayNamaWBP").innerHTML = `🧑‍⚖️ WBP: ${escapeHtml(namaWBP)}`;
+    
+    // Tampilkan overlay
+    overlay.style.display = "flex";
+    
+    // Hapus timer sebelumnya jika ada
+    if (overlayTimeout) clearTimeout(overlayTimeout);
+    // Auto tutup setelah 10 detik
+    overlayTimeout = setTimeout(() => {
+      if (overlay) overlay.style.display = "none";
+      overlayTimeout = null;
+    }, 10000);
+  }
+
+  // Fungsi untuk menyembunyikan overlay manual
+  function tutupOverlayManual() {
+    const overlay = document.getElementById("fullscreenOverlay");
+    if (overlay) overlay.style.display = "none";
+    if (overlayTimeout) {
+      clearTimeout(overlayTimeout);
+      overlayTimeout = null;
+    }
+  }
+
+  // Event listener untuk tombol tutup overlay
+  document.addEventListener("DOMContentLoaded", () => {
+    const btnTutup = document.getElementById("tutupOverlayBtn");
+    if (btnTutup) btnTutup.addEventListener("click", tutupOverlayManual);
+  });
 
   // Kalibrasi waktu server
   async function calibrateServerTime() {
@@ -306,7 +433,7 @@
   function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
   setInterval(async () => { if(isOffsetReady) await calibrateServerTime(); renderTabel(); }, 30000);
 
-  // Suara
+  // Suara (perempuan)
   async function getSuaraPerempuan() {
     return new Promise((resolve) => {
       if (suaraPerempuan) resolve(suaraPerempuan);
@@ -402,9 +529,9 @@
     return { text: "✔️ SELESAI", class: "merah", selesai: true };
   }
 
-  // Render tabel (urutan terbaru di atas)
   function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;" })[m]); }
   function jsEscape(str) { if(!str) return ''; return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
+  
   let renderRequestId = null;
   async function renderTabel() {
     if (!isOffsetReady) {
@@ -428,13 +555,15 @@
     for (const item of sortedData) {
       const status = hitungStatus(item);
       let nomorAntrian = item.nomor ?? "—";
-      // Panggilan otomatis hanya sekali saat SELESAI
+      // Panggilan otomatis + OVERLAY FULLSCREEN saat SELESAI (hanya sekali)
       if (status.selesai && !item.sudahDipanggil) {
         try {
           await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
           item.sudahDipanggil = true;
         } catch(e) {}
         addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+        // TAMPILKAN OVERLAY FULLSCREEN dengan nomor besar + nama pengunjung + WBP
+        tampilkanOverlayFullscreen(nomorAntrian, item.nama, item.wbp);
         tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
       }
       const safeNomor = jsEscape(String(nomorAntrian));
@@ -452,7 +581,7 @@
               <button class="btn-hapus-satu" onclick="window.hapusData('${item.id}')">🗑 Hapus</button>
             </div>
           </td>
-        </table>
+        </tr>
       `;
     }
     tbody.innerHTML = html;
@@ -492,7 +621,7 @@
     setTimeout(() => { if(notifBox.firstChild) notifBox.innerHTML = ""; }, 2500);
   };
 
-  // Listener realtime
+  // Listener realtime Firestore
   onSnapshot(collection(db, "antrian"), (snapshot) => {
     const newData = [];
     snapshot.forEach(docSnap => newData.push({ id: docSnap.id, ...docSnap.data() }));
