@@ -44,7 +44,6 @@
       }
       .judul h2 {
         color: #1e3c4a;
-        /* garis vertikal kuning dihapus sesuai permintaan */
         display: inline-block;
         padding: 0 20px;
       }
@@ -135,7 +134,6 @@
         <p>LAPAS KELAS IIA CIKARANG</p>
       </div>
       
-      <!-- KOLOM NOMOR ANTRIAN (MANUAL / OPSIONAL) -->
       <div class="form-group">
         <label>🔢 Nomor Antrian <span style="font-weight:normal;">(Opsional)</span></label>
         <input type="number" id="nomorAntrian" placeholder="Kosongkan = otomatis (1,2,3...)" min="1" step="1" />
@@ -163,7 +161,6 @@
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
-      // ====================== LOAD JUMLAH ANTRIAN ======================
       async function loadData() {
         try {
           const snapshot = await getDocs(collection(db, "antrian"));
@@ -184,7 +181,6 @@
         setTimeout(() => { div.remove(); }, 3500);
       }
 
-      // ====================== GENERATE NOMOR OTOMATIS (INCREMENT) ======================
       async function getNextNomor() {
         const counterRef = doc(db, "counter", "antrianCounter");
         try {
@@ -200,7 +196,6 @@
           return result;
         } catch (error) {
           console.error("Gagal mendapatkan nomor antrian (transaksi):", error);
-          // Fallback: cari nomor tertinggi dari koleksi antrian
           const snapshot = await getDocs(collection(db, "antrian"));
           let max = 0;
           snapshot.forEach(docSnap => {
@@ -211,14 +206,12 @@
         }
       }
 
-      // ====================== CEK APAKAH NOMOR SUDAH TERPAKAI ======================
       async function isNomorTerpakai(nomor) {
         const q = query(collection(db, "antrian"), where("nomor", "==", nomor));
         const snapshot = await getDocs(q);
         return !snapshot.empty;
       }
 
-      // ====================== UPDATE COUNTER JIKA NOMOR MANUAL LEBIH BESAR ======================
       async function updateCounterJikaPerlu(nomorManual) {
         const counterRef = doc(db, "counter", "antrianCounter");
         await runTransaction(db, async (transaction) => {
@@ -231,7 +224,6 @@
         });
       }
 
-      // ====================== TAMBAH ANTRIAN (DENGAN DUKUNGAN MANUAL ATAU OTOMATIS) ======================
       window.tambahAntrianBaru = async function () {
         let nama = document.getElementById("namaPengunjung").value.trim();
         let wbp = document.getElementById("namaWbp").value.trim();
@@ -245,43 +237,35 @@
         let nomorFinal = null;
         let isManual = false;
 
-        // KASUS 1: input nomor diisi (manual)
         if (inputNomor !== "") {
           const nomorParsed = parseInt(inputNomor, 10);
           if (isNaN(nomorParsed) || nomorParsed < 1) {
             tampilNotif("❌ Nomor antrian harus angka positif (minimal 1)", true);
             return;
           }
-
-          // Cek apakah nomor sudah terpakai
           const sudahTerpakai = await isNomorTerpakai(nomorParsed);
           if (sudahTerpakai) {
             tampilNotif(`❌ Nomor ${nomorParsed} sudah digunakan. Gunakan nomor lain atau kosongkan untuk otomatis.`, true);
             return;
           }
-
           nomorFinal = nomorParsed;
           isManual = true;
-        } 
-        // KASUS 2: kosongkan -> generate otomatis
-        else {
+        } else {
           nomorFinal = await getNextNomor();
           isManual = false;
         }
 
-        // Pastikan nomorFinal tidak null
         if (!nomorFinal) {
           tampilNotif("❌ Gagal menentukan nomor antrian", true);
           return;
         }
 
         try {
-          // Untuk manual: update counter jika nomor manual > counter saat ini (agar urutan otomatis selanjutnya lebih besar)
           if (isManual) {
             await updateCounterJikaPerlu(nomorFinal);
           }
 
-          // Simpan ke Firestore (gunakan addDoc agar ID tetap unik, tapi field nomor kita set manual)
+          // PERBAIKAN: durasi kunjungan diubah menjadi 300 detik (5 menit)
           await addDoc(collection(db, "antrian"), {
             nomor: nomorFinal,
             nama: nama,
@@ -290,14 +274,13 @@
             createdAt: serverTimestamp(),
             durasiPersiapan: 10,
             durasiKunjungan: 15,
-            sudahDipanggil: false   // biar sinkron dengan dashboard
+            sudahDipanggil: false
           });
 
           tampilNotif(`✅ Antrian berhasil ditambahkan (Nomor: ${nomorFinal})`);
-          // Reset form
           document.getElementById("namaPengunjung").value = "";
           document.getElementById("namaWbp").value = "";
-          document.getElementById("nomorAntrian").value = "";   // kosongkan input manual
+          document.getElementById("nomorAntrian").value = "";
           document.getElementById("namaPengunjung").focus();
           loadData();
         } catch (error) {
@@ -310,7 +293,6 @@
         window.location.href = "./Jamkot0.html";
       };
 
-      // ====================== INIT ======================
       loadData();
       setInterval(loadData, 5000);
     </script>
