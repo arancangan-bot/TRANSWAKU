@@ -36,12 +36,15 @@
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
+      margin-bottom: 0;
+      padding-bottom: 15px;
       border-bottom: 4px solid #facc15;
-      padding-bottom: 8px;
-      margin-bottom: 8px;
-      gap: 15px;
+      background-image: url('background.png');
+      background-size: cover;
+      background-position: center 30%;
+      background-repeat: no-repeat;
+      border-radius: 24px 24px 0 0;
     }
-
     .logo-left,
     .logo-right {
       padding: 8px 0;
@@ -221,12 +224,12 @@
   <div class="table-wrapper">
     <table id="antrianTable">
       <thead>
-        <tr><th>No. Antrian</th><th>Nama Pengunjung</th><th>Nama WBP</th><th>Status / Waktu</th><th>Aksi</th></tr>
+        <tr><th style="text-align:center">No. Antrian</th><th>Nama Pengunjung</th><th>Nama WBP</th><th>Status / Waktu</th><th>Aksi</th></tr>
       </thead>
       <tbody id="tabelData">
         <tr><td colspan="5" style="text-align:center">⏳ Memuat data antrian...</td></tr>
       </tbody>
-    </table>
+    <table>
   </div>
 
   <div class="hapus-semua-wrapper">
@@ -234,7 +237,7 @@
   </div>
 </div>
 
-<!-- Tombol Input di luar kotak putih, ukuran kecil, tidak terlalu pojok -->
+<!-- Tombol Input di luar kotak putih -->
 <a href="input.html" class="floating-input-btn">
   <span>📝</span> Input
 </a>
@@ -266,6 +269,9 @@
   let isProcessingQueue = false;
   let serverTimeOffset = 0;
   let isOffsetReady = false;
+
+  // Set untuk mencegah panggilan ganda untuk nomor antrian yang sama (dalam waktu berdekatan)
+  const activeCalls = new Set();
 
   // Perintah panggilan ulang antar device
   const perintahPanggilanRef = collection(db, "perintah_panggilan");
@@ -337,9 +343,21 @@
     audio.play().catch(e => console.warn("Gagal putar backsound:", e));
   }
   async function panggilSekali(nomor, nama, wbp) {
-    putarBacksound();
-    await new Promise(resolve => setTimeout(resolve, 2800));
-    await playSuara(nomor, nama, wbp);
+    // Cegah panggilan ganda untuk nomor yang sama
+    const key = `${nomor}|${nama}|${wbp}`;
+    if (activeCalls.has(key)) {
+      console.log(`Panggilan untuk antrian ${nomor} sudah dalam proses, dilewati.`);
+      return;
+    }
+    activeCalls.add(key);
+    try {
+      putarBacksound();
+      await new Promise(resolve => setTimeout(resolve, 2800));
+      await playSuara(nomor, nama, wbp);
+    } finally {
+      // Hapus dari set setelah selesai (dengan delay agar tidak ke-trigger ulang terlalu cepat)
+      setTimeout(() => activeCalls.delete(key), 3000);
+    }
   }
 
   async function processQueue() {
@@ -347,12 +365,15 @@
     isProcessingQueue = true;
     while (callQueue.length) {
       const task = callQueue.shift();
-      try { await task(); } catch(e) {}
+      try { await task(); } catch(e) { console.error(e); }
       await new Promise(r => setTimeout(r, 500));
     }
     isProcessingQueue = false;
   }
-  function addToQueue(fn, ...args) { callQueue.push(() => fn(...args)); processQueue(); }
+  function addToQueue(fn, ...args) { 
+    callQueue.push(() => fn(...args)); 
+    processQueue(); 
+  }
 
   // Kirim perintah panggilan ulang ke semua device
   async function kirimPerintahPanggilan(nomor, nama, wbp) {
@@ -373,7 +394,9 @@
     if (isProcessingCommand) return;
     isProcessingCommand = true;
     for (const change of snapshot.docChanges()) {
-      if (change.type === "added") await eksekusiPerintahPanggilan(change.doc);
+      if (change.type === "added") {
+        await eksekusiPerintahPanggilan(change.doc);
+      }
     }
     isProcessingCommand = false;
   });
@@ -428,7 +451,7 @@
     for (const item of sortedData) {
       const status = hitungStatus(item);
       let nomorAntrian = item.nomor ?? "—";
-      // Panggilan otomatis hanya sekali saat SELESAI
+      // Panggilan otomatis hanya sekali saat SELESAI (dengan pengecekan sudahDipanggil)
       if (status.selesai && !item.sudahDipanggil) {
         try {
           await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
@@ -442,7 +465,7 @@
       const safeWbp = jsEscape(item.wbp);
       html += `
         <tr>
-          <td style="font-weight:600;">${escapeHtml(String(nomorAntrian))}</td>
+          <td style="font-weight:600; text-align:center;">${escapeHtml(String(nomorAntrian))}</td>
           <td>${escapeHtml(item.nama)}</td>
           <td>${escapeHtml(item.wbp)}</td>
           <td><span class="${status.class}">${status.text}</span></td>
@@ -452,7 +475,7 @@
               <button class="btn-hapus-satu" onclick="window.hapusData('${item.id}')">🗑 Hapus</button>
             </div>
           </td>
-        </table>
+        </tr>
       `;
     }
     tbody.innerHTML = html;
@@ -469,6 +492,9 @@
 
   window.ulangiPanggilanRow = function(nomor, nama, wbp) {
     if (!nomor || !nama || !wbp) return;
+    // Langsung panggil, tapi fungsi panggilSekali akan mengecek duplikasi via Set
+    addToQueue(panggilSekali, nomor, nama, wbp);
+    // Kirim perintah ke device lain (tetap dikirim)
     kirimPerintahPanggilan(nomor, nama, wbp);
     tampilNotif("📢 Perintah Panggilan Ulang", `Antrian ${nomor} akan diputar di semua layar`, "#0f5c6e");
   };
