@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Jamkot | Dashboard Antrian - Lapas Cikarang (Urutan Waktu Terbaru)</title>
+  <title>Jamkot | Dashboard Antrian - Lapas Cikarang (Sinkron Penuh)</title>
   <style>
     * {
       margin: 0;
@@ -75,7 +75,6 @@
       object-fit: contain;
     }
 
-    /* Tombol input di luar kotak putih */
     .floating-input-btn {
       position: fixed;
       bottom: 35px;
@@ -127,6 +126,10 @@
       top: 0;
       font-weight: 600;
       z-index: 10;
+    }
+    /* PERBAIKAN: nomor antrian di tengah */
+    td:first-child, th:first-child {
+      text-align: center;
     }
 
     td {
@@ -204,7 +207,6 @@
       background: #c53a3a;
     }
 
-    /* FULLSCREEN OVERLAY untuk pemberitahuan waktu habis */
     .fullscreen-overlay {
       position: fixed;
       top: 0;
@@ -283,7 +285,7 @@
 </head>
 <body>
 
-<div class="main-container" id="mainContainer">
+<div class="main-container">
   <div class="header-wrapper">
     <div class="logo-left"><img src="imipas.png" alt="Kemenimipas" onerror="this.style.display='none'"></div>
     <div class="judul-utama">
@@ -310,15 +312,9 @@
   </div>
 </div>
 
-<!-- Tombol Input -->
-<a href="input.html" class="floating-input-btn">
-  <span>📝</span> Input
-</a>
-
-<!-- Notifikasi kecil (opsional, tetap dipertahankan) -->
+<a href="input.html" class="floating-input-btn"><span>📝</span> Input</a>
 <div id="notifikasi" style="display: none"></div>
 
-<!-- FULLSCREEN OVERLAY untuk waktu habis -->
 <div id="fullscreenOverlay" class="fullscreen-overlay" style="display: none;">
   <div class="overlay-content">
     <div style="font-size:1.5rem; font-weight:300;">⏰ WAKTU KUNJUNGAN HABIS ⏰</div>
@@ -333,7 +329,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
   import {
     getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs,
-    serverTimestamp, setDoc, updateDoc, addDoc
+    serverTimestamp, setDoc, updateDoc, addDoc, runTransaction
   } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -354,34 +350,34 @@
   let isProcessingQueue = false;
   let serverTimeOffset = 0;
   let isOffsetReady = false;
-  let overlayTimeout = null; // untuk auto hide overlay
+  let overlayTimeout = null;
+  let shownOverlayIds = new Set();
 
-  // Perintah panggilan ulang antar device
+  const timeoutBroadcastRef = collection(db, "timeoutOverlay");
   const perintahPanggilanRef = collection(db, "perintah_panggilan");
 
-  // Fungsi untuk menampilkan overlay fullscreen (menutupi seluruh layar)
-  function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP) {
+  function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP, broadcastId = null) {
+    const uniqueKey = `${nomor}_${namaPengunjung}_${namaWBP}`;
+    if (shownOverlayIds.has(uniqueKey)) return;
+    shownOverlayIds.add(uniqueKey);
+    setTimeout(() => shownOverlayIds.delete(uniqueKey), 30000);
+
     const overlay = document.getElementById("fullscreenOverlay");
     if (!overlay) return;
     
-    // Isi data
     document.getElementById("overlayNomor").innerText = nomor;
     document.getElementById("overlayNamaPengunjung").innerHTML = `👤 Pengunjung: ${escapeHtml(namaPengunjung)}`;
     document.getElementById("overlayNamaWBP").innerHTML = `🧑‍⚖️ WBP: ${escapeHtml(namaWBP)}`;
     
-    // Tampilkan overlay
     overlay.style.display = "flex";
     
-    // Hapus timer sebelumnya jika ada
     if (overlayTimeout) clearTimeout(overlayTimeout);
-    // Auto tutup setelah 10 detik
     overlayTimeout = setTimeout(() => {
       if (overlay) overlay.style.display = "none";
       overlayTimeout = null;
-    }, 10000);
+    }, 12000);
   }
 
-  // Fungsi untuk menyembunyikan overlay manual
   function tutupOverlayManual() {
     const overlay = document.getElementById("fullscreenOverlay");
     if (overlay) overlay.style.display = "none";
@@ -391,13 +387,11 @@
     }
   }
 
-  // Event listener untuk tombol tutup overlay
   document.addEventListener("DOMContentLoaded", () => {
     const btnTutup = document.getElementById("tutupOverlayBtn");
     if (btnTutup) btnTutup.addEventListener("click", tutupOverlayManual);
   });
 
-  // Kalibrasi waktu server
   async function calibrateServerTime() {
     const savedOffset = localStorage.getItem("serverTimeOffset");
     const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
@@ -431,9 +425,8 @@
     isOffsetReady = true;
   }
   function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-  setInterval(async () => { if(isOffsetReady) await calibrateServerTime(); renderTabel(); }, 30000);
+  setInterval(async () => { if(isOffsetReady) await calibrateServerTime(); renderTabel(); }, 45000);
 
-  // Suara (perempuan)
   async function getSuaraPerempuan() {
     return new Promise((resolve) => {
       if (suaraPerempuan) resolve(suaraPerempuan);
@@ -481,7 +474,6 @@
   }
   function addToQueue(fn, ...args) { callQueue.push(() => fn(...args)); processQueue(); }
 
-  // Kirim perintah panggilan ulang ke semua device
   async function kirimPerintahPanggilan(nomor, nama, wbp) {
     try {
       await addDoc(perintahPanggilanRef, { nomor, nama, wbp, createdAt: serverTimestamp() });
@@ -505,7 +497,67 @@
     isProcessingCommand = false;
   });
 
-  // Status timer
+  async function broadcastTimeoutOverlay(antrianId, nomor, nama, wbp) {
+    try {
+      const broadcastDoc = await addDoc(timeoutBroadcastRef, {
+        antrianId, nomor, nama, wbp, createdAt: serverTimestamp(),
+      });
+      setTimeout(async () => {
+        try { await deleteDoc(doc(db, "timeoutOverlay", broadcastDoc.id)); } catch(e) {}
+      }, 15000);
+    } catch(e) { console.warn("Gagal broadcast overlay:", e); }
+  }
+
+  let processingBroadcast = false;
+  onSnapshot(timeoutBroadcastRef, async (snapshot) => {
+    if (processingBroadcast) return;
+    processingBroadcast = true;
+    for (const change of snapshot.docChanges()) {
+      if (change.type === "added") {
+        const data = change.doc.data();
+        if (data.nomor && data.nama && data.wbp) {
+          tampilkanOverlayFullscreen(data.nomor, data.nama, data.wbp, change.doc.id);
+        }
+      }
+    }
+    processingBroadcast = false;
+  });
+
+  async function handleTimeoutIfNeeded(item) {
+    if (!item.createdAt || typeof item.createdAt.toDate !== 'function') return false;
+    const serverCreated = item.createdAt.toDate().getTime();
+    const serverNow = getCurrentServerTime();
+    let elapsed = (serverNow - serverCreated) / 1000;
+    if (elapsed < 0) elapsed = 0;
+    const persiapan = item.durasiPersiapan || 10;
+    // Gunakan durasiKunjungan dari item, jika tidak ada atau 0, pakai 300 (5 menit)
+    let kunjungan = item.durasiKunjungan;
+    if (!kunjungan || kunjungan < 60) kunjungan = 300; // perbaikan untuk data lama yang bernilai 15
+    const totalDurasi = persiapan + kunjungan;
+    if (elapsed >= totalDurasi && !item.sudahDipanggil) {
+      const antrianRef = doc(db, "antrian", item.id);
+      try {
+        const success = await runTransaction(db, async (transaction) => {
+          const docSnap = await transaction.get(antrianRef);
+          if (!docSnap.exists()) return false;
+          const data = docSnap.data();
+          if (data.sudahDipanggil === true) return false;
+          transaction.update(antrianRef, { sudahDipanggil: true });
+          return true;
+        });
+        if (success) {
+          addToQueue(panggilSekali, item.nomor, item.nama, item.wbp);
+          await broadcastTimeoutOverlay(item.id, item.nomor, item.nama, item.wbp);
+          item.sudahDipanggil = true;
+          return true;
+        }
+      } catch (err) {
+        console.warn("Gagal proses timeout (transaksi):", err);
+      }
+    }
+    return false;
+  }
+
   function hitungStatus(item) {
     if (!item.createdAt || typeof item.createdAt.toDate !== 'function')
       return { text: "⏳ Menunggu", class: "hijau" };
@@ -514,7 +566,8 @@
     let elapsed = (serverNow - serverCreated) / 1000;
     if (elapsed < 0) elapsed = 0;
     const persiapan = item.durasiPersiapan || 10;
-    const kunjungan = item.durasiKunjungan || 300;
+    let kunjungan = item.durasiKunjungan;
+    if (!kunjungan || kunjungan < 60) kunjungan = 300;
     if (elapsed < persiapan) {
       const sisa = persiapan - elapsed;
       return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
@@ -536,42 +589,40 @@
   async function renderTabel() {
     if (!isOffsetReady) {
       document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
+      if (renderRequestId) cancelAnimationFrame(renderRequestId);
+      renderRequestId = requestAnimationFrame(() => setTimeout(() => renderTabel(), 500));
       return;
     }
     const tbody = document.getElementById("tabelData");
     if (!tbody) return;
+    
+    for (const item of daftarData) {
+      await handleTimeoutIfNeeded(item);
+    }
+    
     const sortedData = [...daftarData].sort((a,b) => {
       let ta = a.createdAt?.toDate?.()?.getTime() || 0;
       let tb = b.createdAt?.toDate?.()?.getTime() || 0;
       return tb - ta;
     });
+    
     if (sortedData.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">📭 Belum ada antrian. Silakan input antrian baru.</td></tr>';
       if (renderRequestId) cancelAnimationFrame(renderRequestId);
-      renderRequestId = requestAnimationFrame(() => setTimeout(() => renderTabel(), 500));
+      renderRequestId = requestAnimationFrame(() => setTimeout(() => renderTabel(), 800));
       return;
     }
+    
     let html = '';
     for (const item of sortedData) {
       const status = hitungStatus(item);
       let nomorAntrian = item.nomor ?? "—";
-      // Panggilan otomatis + OVERLAY FULLSCREEN saat SELESAI (hanya sekali)
-      if (status.selesai && !item.sudahDipanggil) {
-        try {
-          await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
-          item.sudahDipanggil = true;
-        } catch(e) {}
-        addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-        // TAMPILKAN OVERLAY FULLSCREEN dengan nomor besar + nama pengunjung + WBP
-        tampilkanOverlayFullscreen(nomorAntrian, item.nama, item.wbp);
-        tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
-      }
       const safeNomor = jsEscape(String(nomorAntrian));
       const safeNama = jsEscape(item.nama);
       const safeWbp = jsEscape(item.wbp);
       html += `
         <tr>
-          <td style="font-weight:600;">${escapeHtml(String(nomorAntrian))}</td>
+          <td style="font-weight:600; text-align:center;">${escapeHtml(String(nomorAntrian))}</td>
           <td>${escapeHtml(item.nama)}</td>
           <td>${escapeHtml(item.wbp)}</td>
           <td><span class="${status.class}">${status.text}</span></td>
@@ -616,12 +667,13 @@
     await Promise.all(promises);
     const counterRef = doc(db, "counter", "antrianCounter");
     await setDoc(counterRef, { value: 0 });
+    const broadcastSnap = await getDocs(collection(db, "timeoutOverlay"));
+    broadcastSnap.forEach(d => deleteDoc(doc(db, "timeoutOverlay", d.id)));
     const notifBox = document.getElementById("notifikasi");
     notifBox.innerHTML = `<div style="position:fixed; bottom:70px; left:20px; background:#1e293b; color:#facc15; padding:8px 16px; border-radius:30px;">🗑️ Semua antrian dihapus + counter reset</div>`;
     setTimeout(() => { if(notifBox.firstChild) notifBox.innerHTML = ""; }, 2500);
   };
 
-  // Listener realtime Firestore
   onSnapshot(collection(db, "antrian"), (snapshot) => {
     const newData = [];
     snapshot.forEach(docSnap => newData.push({ id: docSnap.id, ...docSnap.data() }));
