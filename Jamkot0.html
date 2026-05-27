@@ -71,6 +71,11 @@
     .overlay-nomor { font-size: 7rem; font-weight: 800; color: #facc15; text-shadow: 4px 4px 0 #b45309; }
     .overlay-nama, .overlay-wbp { font-size: 2rem; margin: 0.4rem 0; }
     .overlay-tutup { margin-top: 2rem; background: #facc15; color: #1e3c4a; border: none; padding: 12px 32px; border-radius: 50px; cursor: pointer; }
+    .sync-status {
+      position: fixed; bottom: 15px; left: 15px; background: #000000aa; color: white;
+      padding: 6px 12px; border-radius: 30px; font-size: 0.7rem; font-family: monospace;
+      z-index: 2000; backdrop-filter: blur(4px);
+    }
     @media (max-width: 700px) {
       .overlay-nomor { font-size: 3.5rem; }
       .overlay-nama, .overlay-wbp { font-size: 1.2rem; }
@@ -109,6 +114,7 @@
     <button class="overlay-tutup" id="tutupOverlayBtn">TUTUP</button>
   </div>
 </div>
+<div class="sync-status" id="syncStatus">🔄 Menyinkronkan waktu server...</div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
@@ -135,10 +141,14 @@
   let serverTimeOffset = 0;
   let isOffsetReady = false;
   let overlayTimeout = null;
+  let syncInterval = null;
   const perintahPanggilanRef = collection(db, "perintah_panggilan");
 
-  // =================== SINKRONISASI WAKTU SERVER YANG AKURAT ===================
+  // ========== SINKRONISASI WAKTU SERVER YANG AKURAT ==========
   async function calibrateServerTime(force = false) {
+    const statusDiv = document.getElementById("syncStatus");
+    if (statusDiv) statusDiv.innerHTML = "📡 Mengukur waktu server...";
+    
     const now = Date.now();
     const savedOffset = localStorage.getItem("serverTimeOffset");
     const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
@@ -146,9 +156,11 @@
       serverTimeOffset = parseInt(savedOffset);
       isOffsetReady = true;
       console.log("Gunakan offset tersimpan:", serverTimeOffset);
-      return;
+      if (statusDiv) statusDiv.innerHTML = "✅ Waktu tersinkron (cached)";
+      return true;
     }
-    console.log("Kalibrasi waktu server...");
+    
+    console.log("Kalibrasi waktu server dengan 5 sample...");
     const samples = [];
     for (let i = 0; i < 5; i++) {
       try {
@@ -156,40 +168,59 @@
         const before = Date.now();
         await setDoc(tempRef, { ping: serverTimestamp() });
         const snap = await getDoc(tempRef);
-        const serverTime = snap.data().ping.toDate().getTime();
-        const after = Date.now();
-        const rtt = after - before;
-        const clientTime = before + rtt / 2;
-        samples.push(serverTime - clientTime);
-        await deleteDoc(tempRef);
-      } catch(e) { console.warn(e); }
-      await new Promise(r => setTimeout(r, 100));
+        if (snap.exists()) {
+          const serverTime = snap.data().ping.toDate().getTime();
+          const after = Date.now();
+          const rtt = after - before;
+          const clientTime = before + rtt / 2;
+          const diff = serverTime - clientTime;
+          samples.push(diff);
+          console.log(`Sample ${i+1}: diff=${diff}ms, RTT=${rtt}ms`);
+        }
+        await deleteDoc(tempRef).catch(e=>console.warn);
+      } catch(e) { console.warn("Gagal sample", e); }
+      await new Promise(r => setTimeout(r, 200));
     }
-    if (samples.length) {
+    
+    if (samples.length >= 3) {
       samples.sort((a,b)=>a-b);
-      serverTimeOffset = samples[Math.floor(samples.length/2)];
+      const median = samples[Math.floor(samples.length/2)];
+      serverTimeOffset = median;
       localStorage.setItem("serverTimeOffset", serverTimeOffset);
       localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
-      console.log("Offset baru:", serverTimeOffset);
+      isOffsetReady = true;
+      console.log("Offset baru (median):", serverTimeOffset, "ms");
+      if (statusDiv) statusDiv.innerHTML = `✅ Sinkron (offset ${Math.round(serverTimeOffset)}ms)`;
+      return true;
+    } else {
+      console.warn("Kalibrasi gagal, pakai client time sebagai fallback");
+      serverTimeOffset = 0;
+      isOffsetReady = true;
+      if (statusDiv) statusDiv.innerHTML = "⚠️ Mode klien (tanpa sinkron)";
+      return false;
     }
-    isOffsetReady = true;
   }
-  function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-
-  // Kalibrasi awal dan berkala setiap 30 detik
+  
+  function getCurrentServerTime() { 
+    return Date.now() + serverTimeOffset; 
+  }
+  
+  // Lakukan kalibrasi awal & perbaiki setiap 30 detik
   await calibrateServerTime();
   setInterval(() => calibrateServerTime(true), 30000);
-
-  // =================== SISTEM PANGGILAN SUARA + BACKSOUND ===================
+  
+  // ========== SISTEM PANGGILAN SUARA & BACKSOUND ==========
   function putarBacksound() {
     return new Promise((resolve) => {
       const audio = new Audio("backsound.mpeg");
+      audio.volume = 0.7;
       audio.addEventListener('ended', () => resolve());
       audio.addEventListener('error', () => resolve());
       audio.play().catch(() => resolve());
       setTimeout(() => resolve(), 5000);
     });
   }
+  
   async function getSuaraPerempuan() {
     if (suaraPerempuan) return suaraPerempuan;
     return new Promise((resolve) => {
@@ -206,6 +237,7 @@
       }, 100);
     });
   }
+  
   async function playSuara(nomor, nama, wbp) {
     const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama}, kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
     const speech = new SpeechSynthesisUtterance(teks);
@@ -216,26 +248,29 @@
     speechSynthesis.speak(speech);
     return new Promise((resolve) => { speech.onend = resolve; speech.onerror = resolve; });
   }
+  
   async function panggilSekali(nomor, nama, wbp) {
     await putarBacksound();
     await playSuara(nomor, nama, wbp);
   }
+  
   async function processQueue() {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
     while (callQueue.length) {
       const task = callQueue.shift();
-      try { await task(); } catch(e) {}
+      try { await task(); } catch(e) { console.warn(e); }
       await new Promise(r => setTimeout(r, 500));
     }
     isProcessingQueue = false;
   }
   function addToQueue(fn, ...args) { callQueue.push(() => fn(...args)); processQueue(); }
-
-  // =================== PERINTAH PANGGILAN ULANG ===================
+  
+  // ========== PERINTAH PANGGILAN ULANG ==========
   async function kirimPerintahPanggilan(nomor, nama, wbp) {
     await addDoc(perintahPanggilanRef, { nomor, nama, wbp, createdAt: serverTimestamp() });
   }
+  
   async function eksekusiPerintahPanggilan(docSnap) {
     const data = docSnap.data();
     if (data.nomor && data.nama && data.wbp) {
@@ -245,6 +280,7 @@
     }
     await deleteDoc(doc(db, "perintah_panggilan", docSnap.id));
   }
+  
   let isProcessingCommand = false;
   onSnapshot(perintahPanggilanRef, async (snapshot) => {
     if (isProcessingCommand) return;
@@ -254,8 +290,8 @@
     }
     isProcessingCommand = false;
   });
-
-  // =================== OVERLAY FULLSCREEN ===================
+  
+  // ========== OVERLAY FULLSCREEN ==========
   function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP) {
     const overlay = document.getElementById("fullscreenOverlay");
     if (!overlay) return;
@@ -272,11 +308,11 @@
     if (overlayTimeout) clearTimeout(overlayTimeout);
   }
   document.getElementById("tutupOverlayBtn")?.addEventListener("click", tutupOverlayManual);
-
-  // =================== LOGIKA STATUS WAKTU (PERSIAPAN -> KUNJUNGAN -> SELESAI) ===================
+  
+  // ========== STATUS WAKTU (PERSIAPAN -> KUNJUNGAN -> SELESAI) ==========
   function hitungStatus(item) {
     if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
-      return { text: "⏳ Menunggu", class: "hijau" };
+      return { text: "⏳ Menunggu", class: "hijau", selesai: false };
     }
     const serverCreated = item.createdAt.toDate().getTime();
     const serverNow = getCurrentServerTime();
@@ -284,25 +320,28 @@
     if (elapsed < 0) elapsed = 0;
     const durasiPersiapan = item.durasiPersiapan || 10;
     const durasiKunjungan = item.durasiKunjungan || 300;
+    
     if (elapsed < durasiPersiapan) {
       const sisa = durasiPersiapan - elapsed;
-      return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
+      return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau", selesai: false };
     }
     const elapsedKunjungan = elapsed - durasiPersiapan;
     if (elapsedKunjungan < durasiKunjungan) {
       const sisa = durasiKunjungan - elapsedKunjungan;
       const menit = Math.floor(sisa / 60);
       const detik = Math.floor(sisa % 60);
-      return { text: `⏱️ ${menit.toString().padStart(2,'0')}:${detik.toString().padStart(2,'0')}`, class: sisa <= 10 ? "merah" : "" };
+      const kelas = sisa <= 10 ? "merah" : "hijau";
+      return { text: `⏱️ ${menit.toString().padStart(2,'0')}:${detik.toString().padStart(2,'0')}`, class: kelas, selesai: false };
     }
     return { text: "✔️ SELESAI", class: "merah", selesai: true };
   }
-
+  
   function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;" })[m]); }
   function jsEscape(str) { return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
-
-  // =================== RENDER TABEL REALTIME ===================
-  let renderRequestId = null;
+  
+  // ========== RENDER TABEL (update setiap detik) ==========
+  let intervalRender = null;
+  
   async function renderTabel() {
     if (!isOffsetReady) {
       document.getElementById("tabelData").innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Menyinkronkan waktu server...</td></tr>';
@@ -310,32 +349,34 @@
     }
     const tbody = document.getElementById("tabelData");
     if (!tbody) return;
-    // Urutkan berdasarkan createdAt terbaru (desc)
+    
     const sortedData = [...daftarData].sort((a,b) => {
       let ta = a.createdAt?.toDate?.()?.getTime() || 0;
       let tb = b.createdAt?.toDate?.()?.getTime() || 0;
       return tb - ta;
     });
+    
     if (sortedData.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">📭 Belum ada antrian.</td></tr>';
-      if (renderRequestId) cancelAnimationFrame(renderRequestId);
-      renderRequestId = requestAnimationFrame(() => setTimeout(renderTabel, 500));
       return;
     }
+    
     let html = '';
     for (const item of sortedData) {
       const status = hitungStatus(item);
       const nomorAntrian = item.nomor ?? "—";
-      // Trigger SELESAI hanya sekali
+      
+      // Jika status SELESAI dan belum dipanggil, lakukan panggilan dan update flag
       if (status.selesai && !item.sudahDipanggil) {
         try {
           await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
           item.sudahDipanggil = true;
-        } catch(e) {}
-        addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-        tampilkanOverlayFullscreen(nomorAntrian, item.nama, item.wbp);
-        tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
+          addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+          tampilkanOverlayFullscreen(nomorAntrian, item.nama, item.wbp);
+          tampilNotif("⏰ WAKTU HABIS", `${item.nama} → ${item.wbp}`, "#dc2626");
+        } catch(e) { console.warn("Gagal update sudahDipanggil", e); }
       }
+      
       const safeNomor = jsEscape(String(nomorAntrian));
       const safeNama = jsEscape(item.nama);
       const safeWbp = jsEscape(item.wbp);
@@ -355,25 +396,29 @@
       `;
     }
     tbody.innerHTML = html;
-    if (renderRequestId) cancelAnimationFrame(renderRequestId);
-    renderRequestId = requestAnimationFrame(() => setTimeout(renderTabel, 800));
   }
-
+  
+  // Jalankan render setiap 1 detik (akurasi timer realtime)
+  if (intervalRender) clearInterval(intervalRender);
+  intervalRender = setInterval(() => renderTabel(), 1000);
+  
   function tampilNotif(judul, pesan, warna) {
     const box = document.getElementById("notifikasi");
-    box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px 24px; border-radius:28px; z-index:10000; box-shadow:0 6px 18px black;">${judul}<br>${pesan}</div>`;
+    box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px 24px; border-radius:28px; z-index:10000; box-shadow:0 6px 18px black; font-weight:bold;">${judul}<br>${pesan}</div>`;
     box.style.display = "block";
     setTimeout(() => box.style.display = "none", 4500);
   }
-
+  
   window.ulangiPanggilanRow = function(nomor, nama, wbp) {
     if (!nomor || !nama || !wbp) return;
     kirimPerintahPanggilan(nomor, nama, wbp);
   };
+  
   window.hapusData = async function(id) {
     if (!confirm("Hapus antrian ini?")) return;
     await deleteDoc(doc(db, "antrian", id));
   };
+  
   window.hapusSemuaData = async function() {
     if (!confirm("PERINGATAN! Hapus SEMUA antrian?")) return;
     const snapshot = await getDocs(collection(db, "antrian"));
@@ -381,17 +426,25 @@
     await setDoc(doc(db, "counter", "antrianCounter"), { value: 0 });
     tampilNotif("✅ Semua data dihapus", "Counter direset", "#1e293b");
   };
-
-  // Realtime listener antrian
+  
+  // Listener realtime antrian
   onSnapshot(collection(db, "antrian"), (snapshot) => {
     const newData = [];
     snapshot.forEach(docSnap => newData.push({ id: docSnap.id, ...docSnap.data() }));
     daftarData = newData;
-    renderTabel();
+    // render akan dijalankan oleh interval, tidak perlu langsung render di sini
   });
-
-  // Inisialisasi suara
+  
+  // Inisialisasi suara perempuan
   getSuaraPerempuan();
+  
+  // Pastikan render pertama segera dijalankan setelah offset siap
+  const cekOffset = setInterval(() => {
+    if (isOffsetReady) {
+      clearInterval(cekOffset);
+      renderTabel();
+    }
+  }, 200);
 </script>
 </body>
 </html>
