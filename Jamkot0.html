@@ -307,6 +307,17 @@
     <div id="notifikasi" style="display: none"></div>
     <div class="auto-refresh-badge" id="refreshIndicator"></div>
 
+    <!-- FULLSCREEN OVERLAY -->
+    <div id="fullscreenOverlay" class="fullscreen-overlay">
+      <div class="overlay-card">
+        <h1 id="overlayJudul">⏰ WAKTU KUNJUNGAN HABIS ⏰</h1>
+        <div class="overlay-nomor" id="overlayNomor">000</div>
+        <div class="overlay-detail" id="overlayNamaPengunjung">👤 Pengunjung: ---</div>
+        <div class="overlay-detail" id="overlayNamaWBP">🧑‍⚖️ WBP: ---</div>
+        <button class="btn-tutup-overlay" id="tutupOverlayBtn">TUTUP</button>
+      </div>
+    </div>
+
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
       import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
