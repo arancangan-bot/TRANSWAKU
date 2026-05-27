@@ -3,25 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Jamkot | Dashboard Antrian - Lapas Cikarang (Urutan Waktu Terbaru)</title>
+  <title>Jamkot | Dashboard Antrian - Lapas Cikarang (Sinkron Waktu Akurat)</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+      font-family: "Segoe UI", system-ui, sans-serif;
       min-height: 100vh;
       padding: 30px 20px;
       background-image: url("background.png");
       background-size: cover;
       background-position: center;
       background-color: #1e3c4a;
-      position: relative;
     }
-
     .main-container {
       max-width: 1400px;
       margin: 0 auto;
@@ -30,254 +23,63 @@
       padding: 25px 30px 35px;
       box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
     }
-
     .header-wrapper {
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      margin-bottom: 0;
-      padding-bottom: 15px;
       border-bottom: 4px solid #facc15;
       background-image: url('background.png');
       background-size: cover;
-      background-position: center 30%;
-      background-repeat: no-repeat;
       border-radius: 24px 24px 0 0;
     }
-
-    .logo-left {
-      margin-left: 0.5cm;
-    }
-    .logo-right {
-      margin-right: 0.5cm;
-    }
-    .logo-left,
-    .logo-right {
-      padding: 8px 0;
-    }
-
-    .judul-utama {
-      text-align: center;
-      flex: 1;
-    }
-
-    .judul-utama h2 {
-      text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
-      color: #ffe484;
-      font-weight: 700;
-      letter-spacing: 1px;
-    }
-
-    .logo-left img,
-    .logo-right img {
-      height: 90px;
-      object-fit: contain;
-    }
-
+    .logo-left, .logo-right { padding: 8px 0; }
+    .logo-left { margin-left: 0.5cm; }
+    .logo-right { margin-right: 0.5cm; }
+    .logo-left img, .logo-right img { height: 90px; object-fit: contain; }
+    .judul-utama { text-align: center; flex: 1; }
+    .judul-utama h2 { text-shadow: 2px 2px 5px rgba(0,0,0,0.5); color: #ffe484; font-weight: 700; }
     .floating-input-btn {
-      position: fixed;
-      bottom: 35px;
-      right: 35px;
-      background: #2a7f62;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 40px;
-      font-size: 0.85rem;
-      font-weight: bold;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-      z-index: 1000;
-      transition: all 0.2s ease;
-      border: none;
-      cursor: pointer;
+      position: fixed; bottom: 35px; right: 35px;
+      background: #2a7f62; color: white; padding: 8px 16px; border-radius: 40px;
+      font-size: 0.85rem; font-weight: bold; text-decoration: none;
+      display: flex; align-items: center; gap: 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      z-index: 1000; cursor: pointer;
     }
-    .floating-input-btn:hover {
-      background: #3a9f7a;
-      transform: scale(1.02);
-    }
-    .floating-input-btn span {
-      font-size: 1.1rem;
-    }
-
-    .table-wrapper {
-      overflow-x: auto;
-      max-height: 560px;
-      border: 1px solid #cfdee9;
-      border-radius: 1.25rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      font-size: 0.95rem;
-    }
-
-    th {
-      background: #1e3c4a;
-      color: white;
-      padding: 14px 12px;
-      position: sticky;
-      top: 0;
-      font-weight: 600;
-      z-index: 10;
-    }
-
-    td {
-      padding: 12px 8px;
-      border-bottom: 1px solid #e2edf2;
-      vertical-align: middle;
-    }
-
-    .merah {
-      background: #fee2e2;
-      color: #dc2626;
-      border-radius: 40px;
-      padding: 5px 14px;
-      display: inline-block;
-      font-weight: 600;
-    }
-
-    .hijau {
-      background: #dcfce7;
-      color: #0e7c32;
-      border-radius: 40px;
-      padding: 5px 14px;
-      display: inline-block;
-      font-weight: 500;
-    }
-
-    .btn-hapus-satu {
-      background: #b91c1c;
-      padding: 6px 18px;
-      border-radius: 30px;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-      color: white;
-    }
-    .btn-hapus-satu:hover {
-      background: #e03a3a;
-    }
-
-    .btn-ulang-panggilan {
-      background: #0f5c6e;
-      padding: 6px 18px;
-      border-radius: 30px;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-      color: white;
-    }
-    .btn-ulang-panggilan:hover {
-      background: #1a7a8c;
-    }
-
-    .aksi-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-    }
-
-    .hapus-semua-wrapper {
-      text-align: center;
-      margin-top: 24px;
-    }
-    .hapus-semua-wrapper button {
-      background: #9b2c2c;
-      padding: 12px 32px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 40px;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .hapus-semua-wrapper button:hover {
-      background: #c53a3a;
-    }
-
-    /* FULLSCREEN OVERLAY */
+    .table-wrapper { overflow-x: auto; max-height: 560px; border: 1px solid #cfdee9; border-radius: 1.25rem; }
+    table { width: 100%; border-collapse: collapse; background: white; font-size: 0.95rem; }
+    th { background: #1e3c4a; color: white; padding: 14px 12px; position: sticky; top: 0; }
+    td { padding: 12px 8px; border-bottom: 1px solid #e2edf2; }
+    .merah { background: #fee2e2; color: #dc2626; border-radius: 40px; padding: 5px 14px; display: inline-block; font-weight: 600; }
+    .hijau { background: #dcfce7; color: #0e7c32; border-radius: 40px; padding: 5px 14px; }
+    .btn-hapus-satu { background: #b91c1c; padding: 6px 18px; border-radius: 30px; border: none; cursor: pointer; color: white; font-weight: 600; }
+    .btn-ulang-panggilan { background: #0f5c6e; padding: 6px 18px; border-radius: 30px; border: none; cursor: pointer; color: white; }
+    .aksi-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .hapus-semua-wrapper { text-align: center; margin-top: 24px; }
+    .hapus-semua-wrapper button { background: #9b2c2c; padding: 12px 32px; border-radius: 40px; color: white; font-weight: bold; border: none; cursor: pointer; }
     .fullscreen-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.96);
-      backdrop-filter: blur(4px);
-      z-index: 30000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      text-align: center;
-      color: white;
-      font-family: 'Segoe UI', 'Roboto', monospace;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.96); backdrop-filter: blur(4px); z-index: 30000;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      color: white; font-family: monospace;
     }
     .overlay-content {
-      background: rgba(0,0,0,0.85);
-      padding: 2rem 3rem;
-      border-radius: 60px;
-      border-left: 8px solid #facc15;
-      border-right: 8px solid #facc15;
-      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.85); padding: 2rem 3rem; border-radius: 60px;
+      border-left: 8px solid #facc15; border-right: 8px solid #facc15;
       max-width: 90vw;
     }
-    .overlay-nomor {
-      font-size: 7rem;
-      font-weight: 800;
-      letter-spacing: 4px;
-      margin: 0.2em 0;
-      color: #facc15;
-      text-shadow: 4px 4px 0px #b45309;
-    }
-    .overlay-nama {
-      font-size: 2rem;
-      margin: 0.4rem 0;
-      font-weight: 500;
-    }
-    .overlay-wbp {
-      font-size: 2rem;
-      margin: 0.4rem 0;
-      font-weight: 600;
-      color: #ffb347;
-    }
-    .overlay-tutup {
-      margin-top: 2rem;
-      background: #facc15;
-      color: #1e3c4a;
-      border: none;
-      padding: 12px 32px;
-      font-size: 1.2rem;
-      font-weight: bold;
-      border-radius: 50px;
-      cursor: pointer;
-    }
-    .overlay-tutup:hover {
-      background: #ffdd44;
-    }
+    .overlay-nomor { font-size: 7rem; font-weight: 800; color: #facc15; text-shadow: 4px 4px 0 #b45309; }
+    .overlay-nama, .overlay-wbp { font-size: 2rem; margin: 0.4rem 0; }
+    .overlay-tutup { margin-top: 2rem; background: #facc15; color: #1e3c4a; border: none; padding: 12px 32px; border-radius: 50px; cursor: pointer; }
     @media (max-width: 700px) {
       .overlay-nomor { font-size: 3.5rem; }
       .overlay-nama, .overlay-wbp { font-size: 1.2rem; }
-      .overlay-content { padding: 1rem 1.5rem; }
-      body { padding: 15px 12px; }
       .logo-left img, .logo-right img { height: 50px; }
-      .floating-input-btn { padding: 5px 12px; font-size: 0.7rem; bottom: 20px; right: 20px; }
-      .btn-ulang-panggilan, .btn-hapus-satu { padding: 5px 12px; font-size: 0.7rem; }
-      th, td { padding: 8px 4px; font-size: 0.8rem; }
-      .judul-utama h2 { font-size: 1rem; }
+      .floating-input-btn { padding: 5px 12px; bottom: 20px; right: 20px; }
     }
   </style>
 </head>
 <body>
-
 <div class="main-container">
   <div class="header-wrapper">
     <div class="logo-left"><img src="imipas.png" alt="Kemenimipas" onerror="this.style.display='none'"></div>
@@ -288,25 +90,19 @@
     </div>
     <div class="logo-right"><img src="Pemasyarakatan.png" alt="Pemasyarakatan" onerror="this.style.display='none'"></div>
   </div>
-
   <div class="table-wrapper">
     <table id="antrianTable">
       <thead><tr><th>No. Antrian</th><th>Nama Pengunjung</th><th>Nama WBP</th><th>Status / Waktu</th><th>Aksi</th></tr></thead>
       <tbody id="tabelData"><tr><td colspan="5" style="text-align:center">⏳ Memuat data antrian...</td></tr></tbody>
     </table>
   </div>
-
-  <div class="hapus-semua-wrapper">
-    <button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button>
-  </div>
+  <div class="hapus-semua-wrapper"><button onclick="hapusSemuaData()">🗑️ Hapus Semua Data</button></div>
 </div>
-
 <a href="input.html" class="floating-input-btn"><span>📝</span> Input</a>
 <div id="notifikasi" style="display: none"></div>
-
 <div id="fullscreenOverlay" class="fullscreen-overlay" style="display: none;">
   <div class="overlay-content">
-    <div style="font-size:1.5rem; font-weight:300;">⏰ PEMBERITAHUAN ⏰</div>
+    <div style="font-size:1.5rem;">⏰ PEMBERITAHUAN ⏰</div>
     <div class="overlay-nomor" id="overlayNomor">-</div>
     <div class="overlay-nama" id="overlayNamaPengunjung">Pengunjung: -</div>
     <div class="overlay-wbp" id="overlayNamaWBP">WBP: -</div>
@@ -329,7 +125,6 @@
     messagingSenderId: "1070275298561",
     appId: "1:1070275298561:web:c74c42680e7fded17e8700",
   };
-
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
@@ -340,39 +135,20 @@
   let serverTimeOffset = 0;
   let isOffsetReady = false;
   let overlayTimeout = null;
-
   const perintahPanggilanRef = collection(db, "perintah_panggilan");
 
-  // --- Overlay ---
-  function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP) {
-    const overlay = document.getElementById("fullscreenOverlay");
-    if (!overlay) return;
-    document.getElementById("overlayNomor").innerText = nomor;
-    document.getElementById("overlayNamaPengunjung").innerHTML = `Nama Pengunjung: ${escapeHtml(namaPengunjung)}`;
-    document.getElementById("overlayNamaWBP").innerHTML = ` WBP/Tahanan: ${escapeHtml(namaWBP)}`;
-    overlay.style.display = "flex";
-    if (overlayTimeout) clearTimeout(overlayTimeout);
-    overlayTimeout = setTimeout(() => { overlay.style.display = "none"; overlayTimeout = null; }, 10000);
-  }
-
-  function tutupOverlayManual() {
-    const overlay = document.getElementById("fullscreenOverlay");
-    if (overlay) overlay.style.display = "none";
-    if (overlayTimeout) { clearTimeout(overlayTimeout); overlayTimeout = null; }
-  }
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("tutupOverlayBtn")?.addEventListener("click", tutupOverlayManual);
-  });
-
-  // --- Waktu server ---
-  async function calibrateServerTime() {
+  // =================== SINKRONISASI WAKTU SERVER YANG AKURAT ===================
+  async function calibrateServerTime(force = false) {
+    const now = Date.now();
     const savedOffset = localStorage.getItem("serverTimeOffset");
     const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
-    if (savedOffset && savedTime && (Date.now() - parseInt(savedTime) < 5 * 60 * 1000)) {
+    if (!force && savedOffset && savedTime && (now - parseInt(savedTime) < 5 * 60 * 1000)) {
       serverTimeOffset = parseInt(savedOffset);
       isOffsetReady = true;
+      console.log("Gunakan offset tersimpan:", serverTimeOffset);
       return;
     }
+    console.log("Kalibrasi waktu server...");
     const samples = [];
     for (let i = 0; i < 5; i++) {
       try {
@@ -386,7 +162,7 @@
         const clientTime = before + rtt / 2;
         samples.push(serverTime - clientTime);
         await deleteDoc(tempRef);
-      } catch(e) {}
+      } catch(e) { console.warn(e); }
       await new Promise(r => setTimeout(r, 100));
     }
     if (samples.length) {
@@ -394,48 +170,42 @@
       serverTimeOffset = samples[Math.floor(samples.length/2)];
       localStorage.setItem("serverTimeOffset", serverTimeOffset);
       localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
+      console.log("Offset baru:", serverTimeOffset);
     }
     isOffsetReady = true;
   }
   function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-  setInterval(() => { if(isOffsetReady) calibrateServerTime(); renderTabel(); }, 30000);
 
-  // --- Suara dengan backsound yang menunggu hingga selesai ---
-  async function getSuaraPerempuan() {
+  // Kalibrasi awal dan berkala setiap 30 detik
+  await calibrateServerTime();
+  setInterval(() => calibrateServerTime(true), 30000);
+
+  // =================== SISTEM PANGGILAN SUARA + BACKSOUND ===================
+  function putarBacksound() {
     return new Promise((resolve) => {
-      if (suaraPerempuan) resolve(suaraPerempuan);
+      const audio = new Audio("backsound.mpeg");
+      audio.addEventListener('ended', () => resolve());
+      audio.addEventListener('error', () => resolve());
+      audio.play().catch(() => resolve());
+      setTimeout(() => resolve(), 5000);
+    });
+  }
+  async function getSuaraPerempuan() {
+    if (suaraPerempuan) return suaraPerempuan;
+    return new Promise((resolve) => {
       const cek = setInterval(() => {
         const voices = speechSynthesis.getVoices();
         if (voices.length) {
           clearInterval(cek);
-          let preferred = voices.find(v => v.lang === "id-ID" && (v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("perempuan")));
-          if (!preferred) preferred = voices.find(v => v.lang === "id-ID");
-          if (!preferred) preferred = voices.find(v => v.lang.startsWith("id"));
-          suaraPerempuan = preferred || voices[0];
+          let found = voices.find(v => v.lang === "id-ID" && (v.name.includes("female") || v.name.includes("perempuan")));
+          if (!found) found = voices.find(v => v.lang === "id-ID");
+          if (!found) found = voices.find(v => v.lang.startsWith("id"));
+          suaraPerempuan = found || voices[0];
           resolve(suaraPerempuan);
         }
       }, 100);
     });
   }
-
-  // Fungsi memutar backsound dan mengembalikan Promise yang selesai setelah audio benar-benar selesai (atau gagal)
-  function putarBacksound() {
-    return new Promise((resolve) => {
-      const audio = new Audio("backsound.mpeg");
-      audio.addEventListener('ended', () => resolve());
-      audio.addEventListener('error', (e) => {
-        console.warn("Backsound gagal diputar:", e);
-        resolve(); // tetap lanjut meskipun gagal
-      });
-      audio.play().catch((err) => {
-        console.warn("Autoplay backsound ditolak:", err);
-        resolve(); // lanjut tanpa backsound
-      });
-      // Timeout safety: jika backsound terlalu lama (misal 5 detik) tetap lanjut
-      setTimeout(() => resolve(), 5000);
-    });
-  }
-
   async function playSuara(nomor, nama, wbp) {
     const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama}, kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
     const speech = new SpeechSynthesisUtterance(teks);
@@ -444,44 +214,34 @@
     speech.pitch = 1.15;
     speech.voice = await getSuaraPerempuan();
     speechSynthesis.speak(speech);
-    // Mengembalikan Promise yang selesai setelah suara selesai (opsional, tidak wajib di-await)
-    return new Promise((resolve) => {
-      speech.onend = resolve;
-      speech.onerror = resolve;
-    });
+    return new Promise((resolve) => { speech.onend = resolve; speech.onerror = resolve; });
   }
-
   async function panggilSekali(nomor, nama, wbp) {
-    // 1. Putar backsound, TUNGGU hingga selesai
     await putarBacksound();
-    // 2. Setelah backsound selesai, baru putar suara panggilan
     await playSuara(nomor, nama, wbp);
   }
-
-  // Antrean panggilan (memastikan tidak tumpuk)
   async function processQueue() {
     if (isProcessingQueue) return;
     isProcessingQueue = true;
     while (callQueue.length) {
       const task = callQueue.shift();
-      try { await task(); } catch(e) { console.error(e); }
+      try { await task(); } catch(e) {}
       await new Promise(r => setTimeout(r, 500));
     }
     isProcessingQueue = false;
   }
   function addToQueue(fn, ...args) { callQueue.push(() => fn(...args)); processQueue(); }
 
-  // --- Perintah panggilan ulang antar device ---
+  // =================== PERINTAH PANGGILAN ULANG ===================
   async function kirimPerintahPanggilan(nomor, nama, wbp) {
     await addDoc(perintahPanggilanRef, { nomor, nama, wbp, createdAt: serverTimestamp() });
   }
-
   async function eksekusiPerintahPanggilan(docSnap) {
     const data = docSnap.data();
     if (data.nomor && data.nama && data.wbp) {
       tampilkanOverlayFullscreen(data.nomor, data.nama, data.wbp);
       addToQueue(panggilSekali, data.nomor, data.nama, data.wbp);
-      tampilNotif("📢 Panggilan Ulang", `Antrian ${data.nomor} - ${data.nama} (${data.wbp})`, "#0f5c6e");
+      tampilNotif("📢 Panggilan Ulang", `Antrian ${data.nomor} - ${data.nama}`, "#0f5c6e");
     }
     await deleteDoc(doc(db, "perintah_panggilan", docSnap.id));
   }
@@ -495,23 +255,42 @@
     isProcessingCommand = false;
   });
 
-  // --- Status timer ---
+  // =================== OVERLAY FULLSCREEN ===================
+  function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP) {
+    const overlay = document.getElementById("fullscreenOverlay");
+    if (!overlay) return;
+    document.getElementById("overlayNomor").innerText = nomor;
+    document.getElementById("overlayNamaPengunjung").innerHTML = `👤 Pengunjung: ${escapeHtml(namaPengunjung)}`;
+    document.getElementById("overlayNamaWBP").innerHTML = `🧑‍⚖️ WBP: ${escapeHtml(namaWBP)}`;
+    overlay.style.display = "flex";
+    if (overlayTimeout) clearTimeout(overlayTimeout);
+    overlayTimeout = setTimeout(() => overlay.style.display = "none", 10000);
+  }
+  function tutupOverlayManual() {
+    const overlay = document.getElementById("fullscreenOverlay");
+    if (overlay) overlay.style.display = "none";
+    if (overlayTimeout) clearTimeout(overlayTimeout);
+  }
+  document.getElementById("tutupOverlayBtn")?.addEventListener("click", tutupOverlayManual);
+
+  // =================== LOGIKA STATUS WAKTU (PERSIAPAN -> KUNJUNGAN -> SELESAI) ===================
   function hitungStatus(item) {
-    if (!item.createdAt || typeof item.createdAt.toDate !== 'function')
+    if (!item.createdAt || typeof item.createdAt.toDate !== 'function') {
       return { text: "⏳ Menunggu", class: "hijau" };
+    }
     const serverCreated = item.createdAt.toDate().getTime();
     const serverNow = getCurrentServerTime();
     let elapsed = (serverNow - serverCreated) / 1000;
     if (elapsed < 0) elapsed = 0;
-    const persiapan = item.durasiPersiapan || 10;
-    const kunjungan = item.durasiKunjungan || 300;
-    if (elapsed < persiapan) {
-      const sisa = persiapan - elapsed;
+    const durasiPersiapan = item.durasiPersiapan || 10;
+    const durasiKunjungan = item.durasiKunjungan || 300;
+    if (elapsed < durasiPersiapan) {
+      const sisa = durasiPersiapan - elapsed;
       return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
     }
-    const elapsedKunjungan = elapsed - persiapan;
-    if (elapsedKunjungan < kunjungan) {
-      const sisa = kunjungan - elapsedKunjungan;
+    const elapsedKunjungan = elapsed - durasiPersiapan;
+    if (elapsedKunjungan < durasiKunjungan) {
+      const sisa = durasiKunjungan - elapsedKunjungan;
       const menit = Math.floor(sisa / 60);
       const detik = Math.floor(sisa % 60);
       return { text: `⏱️ ${menit.toString().padStart(2,'0')}:${detik.toString().padStart(2,'0')}`, class: sisa <= 10 ? "merah" : "" };
@@ -520,8 +299,9 @@
   }
 
   function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;" })[m]); }
-  function jsEscape(str) { if(!str) return ''; return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
-  
+  function jsEscape(str) { return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
+
+  // =================== RENDER TABEL REALTIME ===================
   let renderRequestId = null;
   async function renderTabel() {
     if (!isOffsetReady) {
@@ -530,21 +310,23 @@
     }
     const tbody = document.getElementById("tabelData");
     if (!tbody) return;
+    // Urutkan berdasarkan createdAt terbaru (desc)
     const sortedData = [...daftarData].sort((a,b) => {
       let ta = a.createdAt?.toDate?.()?.getTime() || 0;
       let tb = b.createdAt?.toDate?.()?.getTime() || 0;
       return tb - ta;
     });
     if (sortedData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">📭 Belum ada antrian. Silakan input antrian baru.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">📭 Belum ada antrian.</td></tr>';
       if (renderRequestId) cancelAnimationFrame(renderRequestId);
-      renderRequestId = requestAnimationFrame(() => setTimeout(() => renderTabel(), 500));
+      renderRequestId = requestAnimationFrame(() => setTimeout(renderTabel, 500));
       return;
     }
     let html = '';
     for (const item of sortedData) {
       const status = hitungStatus(item);
-      let nomorAntrian = item.nomor ?? "—";
+      const nomorAntrian = item.nomor ?? "—";
+      // Trigger SELESAI hanya sekali
       if (status.selesai && !item.sudahDipanggil) {
         try {
           await updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true });
@@ -574,40 +356,33 @@
     }
     tbody.innerHTML = html;
     if (renderRequestId) cancelAnimationFrame(renderRequestId);
-    renderRequestId = requestAnimationFrame(() => setTimeout(() => renderTabel(), 800));
+    renderRequestId = requestAnimationFrame(() => setTimeout(renderTabel, 800));
   }
 
   function tampilNotif(judul, pesan, warna) {
     const box = document.getElementById("notifikasi");
-    box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px 24px; border-radius:28px; z-index:10000; box-shadow:0 6px 18px black; font-weight:bold;"><strong>${judul}</strong><br>${pesan}</div>`;
+    box.innerHTML = `<div style="position:fixed; top:20px; right:20px; background:${warna}; color:white; padding:16px 24px; border-radius:28px; z-index:10000; box-shadow:0 6px 18px black;">${judul}<br>${pesan}</div>`;
     box.style.display = "block";
-    setTimeout(() => { box.style.display = "none"; }, 4500);
+    setTimeout(() => box.style.display = "none", 4500);
   }
 
   window.ulangiPanggilanRow = function(nomor, nama, wbp) {
     if (!nomor || !nama || !wbp) return;
     kirimPerintahPanggilan(nomor, nama, wbp);
   };
-
   window.hapusData = async function(id) {
-    if (!confirm("⚠️ Hapus antrian ini?")) return;
+    if (!confirm("Hapus antrian ini?")) return;
     await deleteDoc(doc(db, "antrian", id));
-    tampilNotif("✅ Terhapus", "Antrian telah dihapus", "#2c5a8c");
   };
-
   window.hapusSemuaData = async function() {
-    if (!confirm("⚠️ PERINGATAN! Hapus SEMUA antrian?")) return;
+    if (!confirm("PERINGATAN! Hapus SEMUA antrian?")) return;
     const snapshot = await getDocs(collection(db, "antrian"));
-    const promises = [];
-    snapshot.forEach(d => promises.push(deleteDoc(doc(db, "antrian", d.id))));
-    await Promise.all(promises);
-    const counterRef = doc(db, "counter", "antrianCounter");
-    await setDoc(counterRef, { value: 0 });
-    const notifBox = document.getElementById("notifikasi");
-    notifBox.innerHTML = `<div style="position:fixed; bottom:70px; left:20px; background:#1e293b; color:#facc15; padding:8px 16px; border-radius:30px;">🗑️ Semua antrian dihapus + counter reset</div>`;
-    setTimeout(() => { if(notifBox.firstChild) notifBox.innerHTML = ""; }, 2500);
+    for (const d of snapshot.docs) await deleteDoc(doc(db, "antrian", d.id));
+    await setDoc(doc(db, "counter", "antrianCounter"), { value: 0 });
+    tampilNotif("✅ Semua data dihapus", "Counter direset", "#1e293b");
   };
 
+  // Realtime listener antrian
   onSnapshot(collection(db, "antrian"), (snapshot) => {
     const newData = [];
     snapshot.forEach(docSnap => newData.push({ id: docSnap.id, ...docSnap.data() }));
@@ -615,11 +390,8 @@
     renderTabel();
   });
 
-  window.onload = async () => {
-    await calibrateServerTime();
-    await getSuaraPerempuan();
-    renderTabel();
-  };
+  // Inisialisasi suara
+  getSuaraPerempuan();
 </script>
 </body>
 </html>
