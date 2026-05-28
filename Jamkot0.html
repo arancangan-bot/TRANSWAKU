@@ -215,7 +215,7 @@
       background: rgba(0, 0, 0, 0.96);
       backdrop-filter: blur(4px);
       z-index: 30000;
-      display: flex;
+      display: none; /* TERSEMBUNYI SECARA DEFAULT, hanya muncul saat dipanggil (waktu habis / ulang panggilan) */
       align-items: center;
       justify-content: center;
       flex-direction: column;
@@ -307,7 +307,7 @@
     <div id="notifikasi" style="display: none"></div>
     <div class="auto-refresh-badge" id="refreshIndicator"></div>
 
-    <!-- FULLSCREEN OVERLAY -->
+    <!-- FULLSCREEN OVERLAY (TIDAK TAMPIL DI AWAL, HANYA SAAT ADA PANGGILAN WAKTU HABIS / ULANG) -->
     <div id="fullscreenOverlay" class="fullscreen-overlay">
       <div class="overlay-card">
         <h1 id="overlayJudul">⏰ WAKTU KUNJUNGAN HABIS ⏰</h1>
