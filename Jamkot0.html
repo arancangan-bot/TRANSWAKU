@@ -215,7 +215,7 @@
       background: rgba(0, 0, 0, 0.96);
       backdrop-filter: blur(4px);
       z-index: 30000;
-      display: none; /* TERSEMBUNYI SECARA DEFAULT, hanya muncul saat dipanggil (waktu habis / ulang panggilan) */
+      display: flex;
       align-items: center;
       justify-content: center;
       flex-direction: column;
@@ -223,6 +223,7 @@
       color: white;
       font-family: 'Segoe UI', 'Roboto', monospace;
       transition: all 0.2s ease;
+      display: none;
     }
     .overlay-content {
       background: rgba(0,0,0,0.85);
@@ -241,16 +242,10 @@
       color: #facc15;
       text-shadow: 4px 4px 0px #b45309;
     }
-    .overlay-nama {
-      font-size: 2rem;
+    .overlay-detail {
+      font-size: 1.5rem;
       margin: 0.4rem 0;
       font-weight: 500;
-    }
-    .overlay-wbp {
-      font-size: 2rem;
-      margin: 0.4rem 0;
-      font-weight: 600;
-      color: #ffb347;
     }
     .overlay-tutup {
       margin-top: 2rem;
@@ -270,7 +265,7 @@
     }
     @media (max-width: 700px) {
       .overlay-nomor { font-size: 3.5rem; }
-      .overlay-nama, .overlay-wbp { font-size: 1.2rem; }
+      .overlay-detail { font-size: 1rem; }
       .overlay-content { padding: 1rem 1.5rem; }
       body { padding: 15px 12px; }
       .logo-left img, .logo-right img { height: 50px; }
@@ -305,22 +300,21 @@
     </div>
     <button class="floating-input-btn" onclick="window.location.href='input.html'">📝 Input Antrian</button>
     <div id="notifikasi" style="display: none"></div>
-    <div class="auto-refresh-badge" id="refreshIndicator"></div>
 
-    <!-- FULLSCREEN OVERLAY (TIDAK TAMPIL DI AWAL, HANYA SAAT ADA PANGGILAN WAKTU HABIS / ULANG) -->
+    <!-- FULLSCREEN OVERLAY untuk panggilan ulang & waktu habis -->
     <div id="fullscreenOverlay" class="fullscreen-overlay">
-      <div class="overlay-card">
+      <div class="overlay-content">
         <h1 id="overlayJudul">⏰ WAKTU KUNJUNGAN HABIS ⏰</h1>
         <div class="overlay-nomor" id="overlayNomor">000</div>
         <div class="overlay-detail" id="overlayNamaPengunjung">👤 Pengunjung: ---</div>
         <div class="overlay-detail" id="overlayNamaWBP">🧑‍⚖️ WBP: ---</div>
-        <button class="btn-tutup-overlay" id="tutupOverlayBtn">TUTUP</button>
+        <button class="overlay-tutup" id="tutupOverlayBtn">TUTUP</button>
       </div>
     </div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getFirestore, collection, onSnapshot, deleteDoc, doc, getDocs, serverTimestamp, setDoc, getDoc, updateDoc, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyBsos9OqujXvezT7YmVLzpCssyup9tBduc",
@@ -340,11 +334,10 @@
       let serverTimeOffset = 0;
       let isOffsetReady = false;
       const perintahPanggilanRef = collection(db, "perintah_panggilan");
-      // Collection untuk broadcast overlay (timeout & ulang)
       const broadcastOverlayRef = collection(db, "broadcastOverlay");
 
-      // Set untuk mencegah overlay ganda dalam waktu singkat
-      const shownOverlayIds = new Set();
+      // Untuk mencegah overlay timeout duplikat dalam 30 detik (tidak berlaku untuk ulang panggilan)
+      const shownTimeoutOverlayIds = new Set();
       let overlayTimeout = null;
 
       // ================== KALIBRASI WAKTU SERVER ==================
@@ -383,7 +376,7 @@
       function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
       setInterval(() => { if(isOffsetReady) calibrateServerTime(); }, 35000);
 
-      // ================== FUNGSI SUARA ==================
+      // ================== FUNGSI SUARA (Hanya untuk panggilan ulang atau timeout realtime) ==================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if(suaraPerempuan) { resolve(suaraPerempuan); return; }
@@ -431,7 +424,6 @@
       }
       function addToQueue(fn, ...args) { callQueue.push(() => fn(...args)); processQueue(); }
 
-      // Kirim perintah suara ke semua layar (seperti sebelumnya)
       async function kirimPerintahPanggilan(nomor, nama, wbp) {
         try { await addDoc(perintahPanggilanRef, { nomor, nama, wbp, createdAt: serverTimestamp() }); } catch(e) { console.warn(e); }
       }
@@ -456,12 +448,16 @@
       function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[m]); }
       
       function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP, tipe = 'timeout') {
-        // Unique key untuk menghindari duplikat dalam 30 detik
-        const uniqueKey = `${tipe}_${nomor}_${namaPengunjung}_${namaWBP}`;
-        if (shownOverlayIds.has(uniqueKey)) return;
-        shownOverlayIds.add(uniqueKey);
-        setTimeout(() => shownOverlayIds.delete(uniqueKey), 30000);
-
+        // Untuk tipe 'ulang' (panggilan ulang), TIDAK ada pencegahan duplikat.
+        // Setiap kali tombol ditekan, overlay akan muncul.
+        if (tipe === 'timeout') {
+          // Untuk timeout, cegah duplikat dalam 30 detik untuk data yang sama
+          const uniqueKey = `${tipe}_${nomor}_${namaPengunjung}_${namaWBP}`;
+          if (shownTimeoutOverlayIds.has(uniqueKey)) return;
+          shownTimeoutOverlayIds.add(uniqueKey);
+          setTimeout(() => shownTimeoutOverlayIds.delete(uniqueKey), 30000);
+        }
+        
         const overlay = document.getElementById("fullscreenOverlay");
         if (!overlay) return;
         
@@ -496,20 +492,17 @@
         }
       }
 
-      // Broadcast untuk timeout (waktu habis)
       async function broadcastTimeoutOverlay(antrianId, nomor, nama, wbp) {
         try {
           const broadcastDoc = await addDoc(broadcastOverlayRef, {
             antrianId, nomor, nama, wbp, tipe: 'timeout', createdAt: serverTimestamp(),
           });
-          // Hapus dokumen setelah 15 detik agar collection tidak membengkak
           setTimeout(async () => {
             try { await deleteDoc(doc(db, "broadcastOverlay", broadcastDoc.id)); } catch(e) {}
           }, 15000);
         } catch(e) { console.warn("Gagal broadcast timeout overlay:", e); }
       }
 
-      // Broadcast khusus untuk ulang panggilan
       async function broadcastUlangOverlay(nomor, nama, wbp) {
         try {
           const broadcastDoc = await addDoc(broadcastOverlayRef, {
@@ -534,7 +527,6 @@
               if (nomor && nama && wbp) {
                 tampilkanOverlayFullscreen(nomor, nama, wbp, tipe || 'timeout');
               }
-              // Hapus dokumen setelah diproses (agar tidak numpuk)
               await deleteDoc(doc(db, "broadcastOverlay", change.doc.id));
             }
           }
@@ -571,7 +563,7 @@
       async function renderTabel() {
         if(!isOffsetReady) {
           const tbody = document.getElementById("tabelData");
-          if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Sinkronisasi waktu...</td></tr>';
+          if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Sinkronisasi waktu......</td></tr>';
           return;
         }
         const tbody = document.getElementById("tabelData");
@@ -588,17 +580,14 @@
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor || "—";
           
-          // Jika status selesai dan belum dipanggil (belum broadcast overlay & suara)
+          // Panggilan otomatis saat waktu habis (realtime, setelah halaman dimuat)
           if(status.selesai && !item.sudahDipanggil) {
             try {
               await updateDoc(doc(db,"antrian",item.id), { sudahDipanggil: true });
               item.sudahDipanggil = true;
-              // Kirim suara via perintah panggilan
               addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-              // KIRIM BROADCAST OVERLAY untuk timeout (waktu habis)
               await broadcastTimeoutOverlay(item.id, nomorAntrian, item.nama, item.wbp);
               
-              // Tampilkan notifikasi kecil opsional (bisa dihapus jika tidak diperlukan)
               const box = document.getElementById("notifikasi");
               if(box) {
                 box.innerHTML = `<div style="background:#dc2626; color:white; padding:14px 22px; border-radius:28px;"><strong>⏰ WAKTU HABIS</strong><br>${escapeHtml(item.nama)} → ${escapeHtml(item.wbp)}</div>`;
@@ -617,10 +606,46 @@
               <button class="btn-ulang-panggilan" onclick="ulangiPanggilanRow('${jsEscape(String(nomorAntrian))}', '${jsEscape(item.nama)}', '${jsEscape(item.wbp)}')">🔁 Ulang Panggilan</button>
               <button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button>
             </div></td>
-          </tr>`;
+           </tr>`;
         }
         if(renderRequestId) cancelAnimationFrame(renderRequestId);
         renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 200); });
+      }
+
+      // ================== SILENT MARK: Tandai antrian yang sudah habis waktu TANPA suara & overlay ==================
+      async function silentMarkExpiredAntrian() {
+        console.log("Menjalankan silent mark untuk antrian yang sudah habis...");
+        if (!isOffsetReady) {
+          console.warn("Waktu server belum siap, tunda silent mark.");
+          return;
+        }
+        try {
+          const snapshot = await getDocs(collection(db, "antrian"));
+          const batch = writeBatch(db);
+          let needCommit = false;
+          
+          for (const docSnap of snapshot.docs) {
+            const item = { id: docSnap.id, ...docSnap.data() };
+            if (item.sudahDipanggil) continue;
+            
+            const status = hitungStatus(item);
+            if (status.selesai === true) {
+              const ref = doc(db, "antrian", item.id);
+              batch.update(ref, { sudahDipanggil: true });
+              needCommit = true;
+              console.log(`Silent mark: antrian ${item.nomor} (${item.nama}) ditandai sudah dipanggil.`);
+            }
+          }
+          
+          if (needCommit) {
+            await batch.commit();
+            console.log("Silent mark selesai, data expired telah ditandai.");
+          } else {
+            console.log("Tidak ada antrian expired yang perlu ditandai.");
+          }
+        } catch (error) {
+          console.error("Gagal melakukan silent mark:", error);
+        }
       }
 
       // ================== FUNGSI GLOBAL UNTUK TOMBOL ==================
@@ -665,11 +690,11 @@
         }
       };
       
+      // Tombol ulang panggilan: mengirim perintah suara + overlay visual ke semua perangkat
+      // Setiap klik akan langsung memicu overlay tanpa pencegahan duplikat
       window.ulangiPanggilanRow = function(nomor, nama, wbp) {
         if(!nomor || !nama || !wbp) return;
-        // Kirim perintah suara ulang ke semua layar
         kirimPerintahPanggilan(nomor, nama, wbp);
-        // Kirim perintah overlay ulang (fullscreen) ke semua layar
         broadcastUlangOverlay(nomor, nama, wbp);
         
         const box = document.getElementById("notifikasi");
@@ -680,15 +705,19 @@
         }
       };
 
-      // ================== LISTENER DATA ANTRIAN ==================
-      onSnapshot(collection(db,"antrian"), (snapshot) => {
-        const newData = [];
-        snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
-        daftarData = newData;
-        renderTabel();
-      });
+      // ================== REALTIME LISTENER ANTRIAN ==================
+      let unsubAntrian = null;
+      function startAntrianListener() {
+        if (unsubAntrian) unsubAntrian();
+        unsubAntrian = onSnapshot(collection(db,"antrian"), (snapshot) => {
+          const newData = [];
+          snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
+          daftarData = newData;
+          renderTabel();
+        });
+      }
 
-      // ================== INIT & TOMBOL TUTUP OVERLAY ==================
+      // ================== INIT ==================
       document.addEventListener("DOMContentLoaded", () => {
         const btnTutup = document.getElementById("tutupOverlayBtn");
         if (btnTutup) btnTutup.addEventListener("click", tutupOverlayManual);
@@ -697,7 +726,9 @@
       window.onload = async function() {
         await calibrateServerTime();
         await getSuaraPerempuan();
-        renderTabel();
+        // Silent mark untuk antrian yang sudah habis sebelum halaman dimuat (tanpa suara/overlay)
+        await silentMarkExpiredAntrian();
+        startAntrianListener();
       };
     </script>
   </body>
