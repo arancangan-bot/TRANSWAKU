@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Jamkot | Dashboard Antrian - Lapas Cikarang (Sinkron Penuh)</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
       min-height: 100vh;
@@ -21,7 +16,6 @@
       background-color: #1e3c4a;
       position: relative;
     }
-
     .main-container {
       max-width: 1400px;
       margin: 0 auto;
@@ -30,7 +24,6 @@
       padding: 25px 30px 35px;
       box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
     }
-
     .header-wrapper {
       display: flex;
       align-items: center;
@@ -45,36 +38,17 @@
       background-repeat: no-repeat;
       border-radius: 24px 24px 0 0;
     }
-
-    .logo-left {
-      margin-left: 0.5cm;
-    }
-    .logo-right {
-      margin-right: 0.5cm;
-    }
-    .logo-left,
-    .logo-right {
-      padding: 8px 0;
-    }
-
-    .judul-utama {
-      text-align: center;
-      flex: 1;
-    }
-
+    .logo-left { margin-left: 0.5cm; }
+    .logo-right { margin-right: 0.5cm; }
+    .logo-left, .logo-right { padding: 8px 0; }
+    .judul-utama { text-align: center; flex: 1; }
     .judul-utama h2 {
       text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
       color: #ffe484;
       font-weight: 700;
       letter-spacing: 1px;
     }
-
-    .logo-left img,
-    .logo-right img {
-      height: 90px;
-      object-fit: contain;
-    }
-
+    .logo-left img, .logo-right img { height: 90px; object-fit: contain; }
     .floating-input-btn {
       position: fixed;
       bottom: 35px;
@@ -95,14 +69,8 @@
       border: none;
       cursor: pointer;
     }
-    .floating-input-btn:hover {
-      background: #3a9f7a;
-      transform: scale(1.02);
-    }
-    .floating-input-btn span {
-      font-size: 1.1rem;
-    }
-
+    .floating-input-btn:hover { background: #3a9f7a; transform: scale(1.02); }
+    .floating-input-btn span { font-size: 1.1rem; }
     .table-wrapper {
       overflow-x: auto;
       max-height: 560px;
@@ -110,14 +78,12 @@
       border-radius: 1.25rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       background: white;
       font-size: 0.95rem;
     }
-
     th {
       background: #1e3c4a;
       color: white;
@@ -127,16 +93,12 @@
       font-weight: 600;
       z-index: 10;
     }
-    td:first-child, th:first-child {
-      text-align: center;
-    }
-
+    td:first-child, th:first-child { text-align: center; }
     td {
       padding: 12px 8px;
       border-bottom: 1px solid #e2edf2;
       vertical-align: middle;
     }
-
     .merah {
       background: #fee2e2;
       color: #dc2626;
@@ -145,7 +107,6 @@
       display: inline-block;
       font-weight: 600;
     }
-
     .hijau {
       background: #dcfce7;
       color: #0e7c32;
@@ -154,7 +115,6 @@
       display: inline-block;
       font-weight: 500;
     }
-
     .btn-hapus-satu {
       background: #b91c1c;
       padding: 6px 18px;
@@ -164,10 +124,7 @@
       font-weight: 600;
       color: white;
     }
-    .btn-hapus-satu:hover {
-      background: #e03a3a;
-    }
-
+    .btn-hapus-satu:hover { background: #e03a3a; }
     .btn-ulang-panggilan {
       background: #0f5c6e;
       padding: 6px 18px;
@@ -177,17 +134,13 @@
       font-weight: 600;
       color: white;
     }
-    .btn-ulang-panggilan:hover {
-      background: #1a7a8c;
-    }
-
+    .btn-ulang-panggilan:hover { background: #1a7a8c; }
     .aksi-container {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       justify-content: center;
     }
-
     .hapus-semua-wrapper {
       text-align: center;
       margin-top: 24px;
@@ -202,10 +155,7 @@
       font-weight: bold;
       cursor: pointer;
     }
-    .hapus-semua-wrapper button:hover {
-      background: #c53a3a;
-    }
-
+    .hapus-semua-wrapper button:hover { background: #c53a3a; }
     .fullscreen-overlay {
       position: fixed;
       top: 0;
@@ -259,10 +209,7 @@
       cursor: pointer;
       transition: 0.2s;
     }
-    .overlay-tutup:hover {
-      background: #ffdd44;
-      transform: scale(1.02);
-    }
+    .overlay-tutup:hover { background: #ffdd44; transform: scale(1.02); }
     @media (max-width: 700px) {
       .overlay-nomor { font-size: 3.5rem; }
       .overlay-detail { font-size: 1rem; }
@@ -306,8 +253,8 @@
       <div class="overlay-content">
         <h1 id="overlayJudul">⏰ WAKTU KUNJUNGAN HABIS ⏰</h1>
         <div class="overlay-nomor" id="overlayNomor">000</div>
-        <div class="overlay-detail" id="overlayNamaPengunjung">👤 Pengunjung: ---</div>
-        <div class="overlay-detail" id="overlayNamaWBP">🧑‍⚖️ WBP: ---</div>
+        <div class="overlay-detail" id="overlayNamaPengunjung"> Pengunjung: ---</div>
+        <div class="overlay-detail" id="overlayNamaWBP"> WBP: ---</div>
         <button class="overlay-tutup" id="tutupOverlayBtn">TUTUP</button>
       </div>
     </div>
@@ -332,26 +279,29 @@
       let callQueue = [];
       let isProcessingQueue = false;
       let serverTimeOffset = 0;
-      let isOffsetReady = false;
+      let isOffsetReady = false; // akan di-set true setelah kalibrasi atau fallback
       const perintahPanggilanRef = collection(db, "perintah_panggilan");
       const broadcastOverlayRef = collection(db, "broadcastOverlay");
 
-      // Untuk mencegah overlay timeout duplikat dalam 30 detik (tidak berlaku untuk ulang panggilan)
       const shownTimeoutOverlayIds = new Set();
       let overlayTimeout = null;
 
-      // ================== KALIBRASI WAKTU SERVER ==================
+      // ================== KALIBRASI WAKTU SERVER (DENGAN FALLBACK) ==================
       async function calibrateServerTime() {
+        // Coba pakai cache dulu
         const savedOffset = localStorage.getItem("serverTimeOffset");
         const savedTime = localStorage.getItem("serverTimeOffsetSavedAt");
         if (savedOffset && savedTime && (Date.now() - parseInt(savedTime) < 5 * 60 * 1000)) {
           serverTimeOffset = parseInt(savedOffset);
           isOffsetReady = true;
+          console.log("Kalibrasi dari cache: offset =", serverTimeOffset);
           return;
         }
-        const samples = [];
-        for (let i = 0; i < 5; i++) {
-          try {
+
+        // Jika tidak ada cache, lakukan pengukuran
+        try {
+          const samples = [];
+          for (let i = 0; i < 5; i++) {
             const tempRef = doc(collection(db, "tempTime"));
             const before = Date.now();
             await setDoc(tempRef, { ping: serverTimestamp() });
@@ -363,20 +313,34 @@
             const offset = serverTime - clientTime;
             samples.push(offset);
             await deleteDoc(tempRef);
-          } catch(e) { console.warn(e); }
-          await new Promise(r => setTimeout(r, 100));
+            await new Promise(r => setTimeout(r, 100));
+          }
+          if (samples.length === 0) throw new Error("Tidak ada sampel");
+          samples.sort((a,b)=>a-b);
+          serverTimeOffset = samples[Math.floor(samples.length/2)];
+          localStorage.setItem("serverTimeOffset", serverTimeOffset);
+          localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
+          isOffsetReady = true;
+          console.log("Kalibrasi sukses, offset =", serverTimeOffset);
+        } catch (e) {
+          console.warn("Kalibrasi gagal, gunakan offset 0 (waktu lokal)", e);
+          serverTimeOffset = 0;
+          isOffsetReady = true; // TETAP set true agar render berjalan
         }
-        if (samples.length === 0) { serverTimeOffset = 0; isOffsetReady = true; return; }
-        samples.sort((a,b)=>a-b);
-        serverTimeOffset = samples[Math.floor(samples.length/2)];
-        localStorage.setItem("serverTimeOffset", serverTimeOffset);
-        localStorage.setItem("serverTimeOffsetSavedAt", Date.now());
-        isOffsetReady = true;
       }
-      function getCurrentServerTime() { return Date.now() + serverTimeOffset; }
-      setInterval(() => { if(isOffsetReady) calibrateServerTime(); }, 35000);
 
-      // ================== FUNGSI SUARA (Hanya untuk panggilan ulang atau timeout realtime) ==================
+      function getCurrentServerTime() {
+        // Jika offset belum siap, gunakan waktu lokal (fallback)
+        if (!isOffsetReady) return Date.now();
+        return Date.now() + serverTimeOffset;
+      }
+
+      // Refresh kalibrasi setiap 35 detik jika offset sudah siap
+      setInterval(() => {
+        if (isOffsetReady) calibrateServerTime();
+      }, 35000);
+
+      // ================== FUNGSI SUARA ==================
       async function getSuaraPerempuan() {
         return new Promise((resolve) => {
           if(suaraPerempuan) { resolve(suaraPerempuan); return; }
@@ -393,6 +357,7 @@
           }, 100);
         });
       }
+
       async function playSuara(nomor, nama, wbp) {
         const teks = `Mohon Perhatian. Nomor antrian ${nomor}, Pengunjung atas nama ${nama}, kunjungan untuk Saudara ${wbp}, waktu kunjungan telah habis. Silakan meninggalkan ruangan kunjungan. Terima kasih.`;
         const speech = new SpeechSynthesisUtterance(teks);
@@ -402,10 +367,12 @@
         speech.voice = await getSuaraPerempuan();
         speechSynthesis.speak(speech);
       }
+
       function putarBacksound() {
         const audio = new Audio("backsound.mpeg");
         audio.play().catch(e => console.warn("Gagal putar backsound:", e));
       }
+
       async function panggilSekali(nomor, nama, wbp) {
         putarBacksound();
         await new Promise(r => setTimeout(r, 3000));
@@ -424,14 +391,17 @@
       }
       function addToQueue(fn, ...args) { callQueue.push(() => fn(...args)); processQueue(); }
 
+      // Perintah panggilan (untuk tombol ulang)
       async function kirimPerintahPanggilan(nomor, nama, wbp) {
         try { await addDoc(perintahPanggilanRef, { nomor, nama, wbp, createdAt: serverTimestamp() }); } catch(e) { console.warn(e); }
       }
+
       async function eksekusiPerintahPanggilan(docSnap) {
         const { nomor, nama, wbp } = docSnap.data();
         if(nomor && nama && wbp) addToQueue(panggilSekali, nomor, nama, wbp);
         await deleteDoc(doc(db, "perintah_panggilan", docSnap.id));
       }
+
       let isProcessingCommand = false;
       onSnapshot(perintahPanggilanRef, async (snapshot) => {
         if(isProcessingCommand) return;
@@ -448,10 +418,7 @@
       function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[m]); }
       
       function tampilkanOverlayFullscreen(nomor, namaPengunjung, namaWBP, tipe = 'timeout') {
-        // Untuk tipe 'ulang' (panggilan ulang), TIDAK ada pencegahan duplikat.
-        // Setiap kali tombol ditekan, overlay akan muncul.
         if (tipe === 'timeout') {
-          // Untuk timeout, cegah duplikat dalam 30 detik untuk data yang sama
           const uniqueKey = `${tipe}_${nomor}_${namaPengunjung}_${namaWBP}`;
           if (shownTimeoutOverlayIds.has(uniqueKey)) return;
           shownTimeoutOverlayIds.add(uniqueKey);
@@ -463,16 +430,12 @@
         
         const overlayJudul = document.getElementById("overlayJudul");
         if (overlayJudul) {
-          if (tipe === 'ulang') {
-            overlayJudul.innerHTML = "📢 PANGGILAN ULANG 📢";
-          } else {
-            overlayJudul.innerHTML = "⏰ WAKTU KUNJUNGAN HABIS ⏰";
-          }
+          overlayJudul.innerHTML = (tipe === 'ulang') ? "📢 PANGGILAN ULANG 📢" : "⏰ WAKTU KUNJUNGAN HABIS ⏰";
         }
 
         document.getElementById("overlayNomor").innerText = nomor;
-        document.getElementById("overlayNamaPengunjung").innerHTML = `👤 Pengunjung: ${escapeHtml(namaPengunjung)}`;
-        document.getElementById("overlayNamaWBP").innerHTML = `🧑‍⚖️ WBP: ${escapeHtml(namaWBP)}`;
+        document.getElementById("overlayNamaPengunjung").innerHTML = ` Pengunjung: ${escapeHtml(namaPengunjung)}`;
+        document.getElementById("overlayNamaWBP").innerHTML = ` WBP: ${escapeHtml(namaWBP)}`;
         
         overlay.style.display = "flex";
         
@@ -514,7 +477,6 @@
         } catch(e) { console.warn("Gagal broadcast ulang overlay:", e); }
       }
 
-      // Listener untuk broadcast overlay (semua layar)
       let isProcessingOverlay = false;
       onSnapshot(broadcastOverlayRef, async (snapshot) => {
         if (isProcessingOverlay) return;
@@ -534,21 +496,25 @@
         finally { isProcessingOverlay = false; }
       });
 
-      // ================== FUNGSI STATUS & RENDER ==================
+      // ================== FUNGSI STATUS & RENDER (DIPERBAIKI) ==================
       function hitungStatus(item) {
-        if(!item.createdAt || typeof item.createdAt.toDate !== 'function') return { text: "⏳ Memuat...", class: "hijau" };
+        // Jika createdAt tidak valid, beri status awal
+        if(!item.createdAt || typeof item.createdAt.toDate !== 'function') {
+          return { text: "⏳ Memuat...", class: "hijau" };
+        }
         const serverCreated = item.createdAt.toDate().getTime();
-        const serverNow = getCurrentServerTime();
-        let elapsed = (serverNow - serverCreated)/1000;
-        if(elapsed<0) elapsed=0;
+        const serverNow = getCurrentServerTime(); // menggunakan fallback jika offset belum siap
+        let elapsed = (serverNow - serverCreated) / 1000;
+        if (elapsed < 0) elapsed = 0;
         const persiapan = item.durasiPersiapan || 10;
         const kunjungan = item.durasiKunjungan || 300;
-        if(elapsed < persiapan) {
+
+        if (elapsed < persiapan) {
           const sisa = persiapan - elapsed;
           return { text: `⏳ PERSIAPAN (${Math.ceil(sisa)}s)`, class: "hijau" };
         }
         const elapsedKunjungan = elapsed - persiapan;
-        if(elapsedKunjungan < kunjungan) {
+        if (elapsedKunjungan < kunjungan) {
           const sisa = kunjungan - elapsedKunjungan;
           const menit = Math.floor(sisa/60);
           const detik = Math.floor(sisa%60);
@@ -559,45 +525,51 @@
 
       function jsEscape(str) { if(!str) return ''; return str.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 
-      let renderRequestId = null;
-      async function renderTabel() {
-        if(!isOffsetReady) {
-          const tbody = document.getElementById("tabelData");
-          if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">⏳ Sinkronisasi waktu......</td></tr>';
+      // ================== RENDER TABEL (TANPA BLOKIR isOffsetReady) ==================
+      // Fungsi render utama - dipanggil dari listener dan dari interval timer
+      function renderTabel() {
+        const tbody = document.getElementById("tabelData");
+        if (!tbody) return;
+
+        // Jika data kosong
+        if (daftarData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Belum ada antrian</td></tr>';
           return;
         }
-        const tbody = document.getElementById("tabelData");
-        if(!tbody) return;
-        tbody.innerHTML = "";
-        
+
+        // Urutkan berdasarkan waktu created (terbaru di atas)
         const sortedData = [...daftarData].sort((a, b) => {
           const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
           const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
           return timeB - timeA;
         });
-        
-        for(const item of sortedData) {
+
+        let html = '';
+        for (const item of sortedData) {
           const status = hitungStatus(item);
           let nomorAntrian = item.nomor || "—";
-          
-          // Panggilan otomatis saat waktu habis (realtime, setelah halaman dimuat)
-          if(status.selesai && !item.sudahDipanggil) {
-            try {
-              await updateDoc(doc(db,"antrian",item.id), { sudahDipanggil: true });
-              item.sudahDipanggil = true;
-              addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
-              await broadcastTimeoutOverlay(item.id, nomorAntrian, item.nama, item.wbp);
-              
-              const box = document.getElementById("notifikasi");
-              if(box) {
-                box.innerHTML = `<div style="background:#dc2626; color:white; padding:14px 22px; border-radius:28px;"><strong>⏰ WAKTU HABIS</strong><br>${escapeHtml(item.nama)} → ${escapeHtml(item.wbp)}</div>`;
-                box.style.display = "block";
-                setTimeout(() => { box.style.display = "none"; }, 4000);
-              }
-            } catch(e) { console.warn("Gagal update sudahDipanggil:", e); }
+
+          // Panggilan otomatis saat waktu habis (hanya jika belum dipanggil)
+          if (status.selesai && !item.sudahDipanggil) {
+            // Tandai sebagai sudah dipanggil (update di Firebase)
+            updateDoc(doc(db, "antrian", item.id), { sudahDipanggil: true })
+              .then(() => {
+                item.sudahDipanggil = true;
+                // Jalankan panggilan suara dan overlay
+                addToQueue(panggilSekali, nomorAntrian, item.nama, item.wbp);
+                broadcastTimeoutOverlay(item.id, nomorAntrian, item.nama, item.wbp);
+                // Notifikasi di pojok
+                const box = document.getElementById("notifikasi");
+                if (box) {
+                  box.innerHTML = `<div style="background:#dc2626; color:white; padding:14px 22px; border-radius:28px;"><strong>⏰ WAKTU HABIS</strong><br>${escapeHtml(item.nama)} → ${escapeHtml(item.wbp)}</div>`;
+                  box.style.display = "block";
+                  setTimeout(() => { box.style.display = "none"; }, 4000);
+                }
+              })
+              .catch(e => console.warn("Gagal update sudahDipanggil:", e));
           }
-          
-          tbody.innerHTML += `<tr>
+
+          html += `<tr>
             <td>${escapeHtml(String(nomorAntrian))}</td>
             <td>${escapeHtml(item.nama)}</td>
             <td>${escapeHtml(item.wbp)}</td>
@@ -606,18 +578,19 @@
               <button class="btn-ulang-panggilan" onclick="ulangiPanggilanRow('${jsEscape(String(nomorAntrian))}', '${jsEscape(item.nama)}', '${jsEscape(item.wbp)}')">🔁 Ulang Panggilan</button>
               <button class="btn-hapus-satu" onclick="hapusData('${item.id}')">🗑 Hapus</button>
             </div></td>
-           </tr>`;
+          </tr>`;
         }
-        if(renderRequestId) cancelAnimationFrame(renderRequestId);
-        renderRequestId = requestAnimationFrame(() => { setTimeout(() => renderTabel(), 200); });
+        tbody.innerHTML = html;
       }
 
-      // ================== SILENT MARK: Tandai antrian yang sudah habis waktu TANPA suara & overlay ==================
+      // ================== SILENT MARK (untuk antrian yang sudah habis sebelum halaman dimuat) ==================
       async function silentMarkExpiredAntrian() {
         console.log("Menjalankan silent mark untuk antrian yang sudah habis...");
+        // Tunggu sebentar agar kalibrasi sempat selesai (atau fallback)
         if (!isOffsetReady) {
-          console.warn("Waktu server belum siap, tunda silent mark.");
-          return;
+          console.warn("Waktu server belum siap, tunda silent mark 2 detik...");
+          await new Promise(r => setTimeout(r, 2000));
+          // Jika masih belum siap, tetap jalankan dengan offset 0 (sudah fallback di getCurrentServerTime)
         }
         try {
           const snapshot = await getDocs(collection(db, "antrian"));
@@ -627,7 +600,6 @@
           for (const docSnap of snapshot.docs) {
             const item = { id: docSnap.id, ...docSnap.data() };
             if (item.sudahDipanggil) continue;
-            
             const status = hitungStatus(item);
             if (status.selesai === true) {
               const ref = doc(db, "antrian", item.id);
@@ -650,10 +622,7 @@
 
       // ================== FUNGSI GLOBAL UNTUK TOMBOL ==================
       window.hapusData = async function(id) {
-        if(!id) {
-          alert("ID data tidak valid!");
-          return;
-        }
+        if(!id) { alert("ID data tidak valid!"); return; }
         if(confirm("Apakah Anda yakin ingin menghapus antrian ini?")) {
           try {
             await deleteDoc(doc(db, "antrian", id));
@@ -690,13 +659,10 @@
         }
       };
       
-      // Tombol ulang panggilan: mengirim perintah suara + overlay visual ke semua perangkat
-      // Setiap klik akan langsung memicu overlay tanpa pencegahan duplikat
       window.ulangiPanggilanRow = function(nomor, nama, wbp) {
         if(!nomor || !nama || !wbp) return;
         kirimPerintahPanggilan(nomor, nama, wbp);
         broadcastUlangOverlay(nomor, nama, wbp);
-        
         const box = document.getElementById("notifikasi");
         if(box) {
           box.innerHTML = `<div style="background:#0f5c6e; color:white; padding:12px 20px; border-radius:28px;"><strong>📡 Perintah dikirim</strong><br>Panggilan ulang antrian ${nomor} (suara + overlay)</div>`;
@@ -709,11 +675,11 @@
       let unsubAntrian = null;
       function startAntrianListener() {
         if (unsubAntrian) unsubAntrian();
-        unsubAntrian = onSnapshot(collection(db,"antrian"), (snapshot) => {
+        unsubAntrian = onSnapshot(collection(db, "antrian"), (snapshot) => {
           const newData = [];
           snapshot.forEach(doc => newData.push({ id: doc.id, ...doc.data() }));
           daftarData = newData;
-          renderTabel();
+          renderTabel(); // langsung render setiap ada perubahan
         });
       }
 
@@ -724,12 +690,23 @@
       });
 
       window.onload = async function() {
+        // 1. Kalibrasi (dengan fallback)
         await calibrateServerTime();
+
+        // 2. Siapkan suara
         await getSuaraPerempuan();
-        // Silent mark untuk antrian yang sudah habis sebelum halaman dimuat (tanpa suara/overlay)
+
+        // 3. Tandai antrian expired (silent)
         await silentMarkExpiredAntrian();
+
+        // 4. Mulai listener realtime
         startAntrianListener();
+
+        // 5. Perbarui status timer setiap 1 detik (tanpa reload data dari Firebase)
+        setInterval(() => {
+          renderTabel(); // update timer saja
+        }, 1000);
       };
     </script>
-  </body>
+</body>
 </html>
